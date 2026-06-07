@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>临床推理评估台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#f3efe6; --paper2:#ece6d8; --card:#fbf9f4;
+  --ink:#22262f; --ink2:#5a606e; --ink3:#8b8f9a;
+  --line:#ddd6c6; --line2:#cfc7b4;
+  --teal:#0f6e60; --teal-d:#0a4f44; --teal-soft:#e3efe9;
+  --amber:#b06a16; --amber-soft:#f3e8d4;
+  --rose:#9d3a3a;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;}
+body{
+  font-family:'IBM Plex Sans',system-ui,sans-serif;
+  color:var(--ink); background:var(--paper);
+  -webkit-font-smoothing:antialiased; display:flex; flex-direction:column; min-height:100vh;
+}
+.mono{font-family:'IBM Plex Mono',monospace;}
+.serif{font-family:'Fraunces',serif;}
+button{font-family:inherit;}
+
+/* ── 顶栏 ── */
+header{
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  padding:14px 22px; background:var(--card); border-bottom:1px solid var(--line2);
+  position:sticky; top:0; z-index:20;
+}
+.logo{
+  width:38px;height:38px;border-radius:9px;flex:0 0 auto;display:grid;place-items:center;color:#fbf9f4;
+  background:linear-gradient(140deg,var(--teal),var(--teal-d)); box-shadow:0 2px 0 var(--teal-d);
+}
+.logo svg{width:20px;height:20px;}
+.title{font-family:'Fraunces',serif;font-weight:600;font-size:20px;line-height:1.1;}
+.sub{font-size:12px;color:var(--ink2);margin-top:2px;}
+.spacer{flex:1 1 auto;}
+.namebox{font-size:13px;padding:8px 11px;border:1px solid var(--line2);border-radius:8px;background:var(--paper);color:var(--ink);width:150px;font-family:inherit;outline:none;}
+.namebox:focus{border-color:var(--teal);}
+.btn{display:inline-flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;font-weight:500;padding:9px 14px;border-radius:8px;border:1px solid transparent;transition:transform .1s ease,background .15s ease;}
+.btn svg{width:15px;height:15px;}
+.btn:active{transform:translateY(1px);}
+.btn-primary{background:var(--teal);color:#fbf9f4;box-shadow:0 2px 0 var(--teal-d);}
+.btn-primary:hover{background:var(--teal-d);}
+.btn-primary:disabled{background:var(--line2);color:#fff;box-shadow:none;cursor:not-allowed;}
+.btn-ghost{background:var(--paper);color:var(--ink);border:1px solid var(--line2);}
+.btn-ghost:hover{background:var(--paper2);}
+.prog-wrap{display:flex;align-items:center;gap:10px;}
+.bar{width:120px;height:6px;border-radius:99px;background:var(--paper2);overflow:hidden;}
+.bar span{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--teal),#3a9c8b);transition:width .35s ease;}
+.pcount{font-size:12px;color:var(--ink2);font-variant-numeric:tabular-nums;white-space:nowrap;}
+
+/* ── 空状态 ── */
+.empty-state{max-width:580px;margin:8vh auto;padding:0 24px;text-align:center;}
+.empty-state h2{font-family:'Fraunces',serif;font-size:27px;font-weight:600;}
+.empty-state .lead{color:var(--ink2);margin-top:8px;font-size:14px;line-height:1.6;}
+.drop{margin-top:26px;border:2px dashed var(--line2);border-radius:16px;padding:46px 28px;background:var(--card);transition:all .18s ease;cursor:pointer;}
+.drop.drag{border-color:var(--teal);background:var(--teal-soft);transform:scale(1.01);}
+.drop svg{width:30px;height:30px;color:var(--teal);}
+.drop h3{font-family:'Fraunces',serif;font-size:18px;font-weight:600;margin:14px 0 6px;}
+.drop p{font-size:13px;color:var(--ink2);line-height:1.6;}
+.fmt{margin-top:18px;font-family:'IBM Plex Mono',monospace;font-size:11.5px;text-align:left;background:var(--paper2);border:1px solid var(--line);border-radius:10px;padding:13px 15px;color:var(--ink2);overflow-x:auto;white-space:pre;}
+.resume{margin-top:14px;font-size:12.5px;color:var(--ink2);}
+.resume a{color:var(--teal-d);cursor:pointer;text-decoration:underline;}
+
+/* ── 错误条 ── */
+.err{margin:14px 22px;padding:11px 14px;border-radius:10px;background:#f6e3e1;border:1px solid #e3b8b3;color:var(--rose);font-size:13px;display:flex;gap:8px;align-items:flex-start;}
+.err svg{width:16px;height:16px;flex:0 0 auto;margin-top:1px;}
+
+/* ── 病例导航 ── */
+.strip{display:flex;align-items:center;gap:8px;padding:11px 22px;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:67px;z-index:15;}
+.nav{display:flex;gap:6px;flex:0 0 auto;}
+.nav button{width:34px;height:34px;border-radius:8px;border:1px solid var(--line2);background:var(--paper);color:var(--ink);cursor:pointer;display:grid;place-items:center;}
+.nav button:hover:not(:disabled){background:var(--paper2);}
+.nav button:disabled{opacity:.4;cursor:not-allowed;}
+.nav svg{width:18px;height:18px;}
+.count{font-size:13px;color:var(--ink2);font-variant-numeric:tabular-nums;white-space:nowrap;padding:0 4px;}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:2px;flex:1 1 auto;}
+.chip{flex:0 0 auto;min-width:30px;height:30px;padding:0 7px;border-radius:7px;border:1px solid var(--line2);background:var(--paper);color:var(--ink2);font-size:12px;font-family:'IBM Plex Mono',monospace;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:3px;transition:all .12s ease;}
+.chip:hover{border-color:var(--teal);color:var(--ink);}
+.chip.done{background:var(--teal-soft);border-color:var(--teal);color:var(--teal-d);}
+.chip.active{background:var(--teal);border-color:var(--teal);color:#fbf9f4;box-shadow:0 2px 0 var(--teal-d);}
+.chip svg{width:12px;height:12px;}
+
+/* ── 显示字段开关 ── */
+.fieldbar{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:9px 22px;background:var(--paper);border-bottom:1px solid var(--line);}
+.fieldbar-l{font-size:11.5px;color:var(--ink3);font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.5px;margin-right:2px;}
+.tog{font-family:'IBM Plex Mono',monospace;font-size:11.5px;cursor:pointer;padding:4px 10px;border-radius:99px;border:1px solid var(--line2);background:var(--card);color:var(--ink3);transition:all .12s ease;}
+.tog:hover{border-color:var(--teal);}
+.tog.on{background:var(--teal-soft);border-color:var(--teal);color:var(--teal-d);}
+
+/* ── 主体两栏 ── */
+.main{display:grid;grid-template-columns:1fr 372px;flex:1 1 auto;min-height:0;}
+@media (max-width:880px){ .main{grid-template-columns:1fr;} }
+.content{padding:26px 28px 60px;overflow-y:auto;}
+.field{margin-bottom:22px;animation:up .4s ease both;}
+@keyframes up{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+.fkey{display:inline-flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--ink3);margin-bottom:7px;}
+.fkey svg{width:13px;height:13px;}
+.prose{font-size:15px;line-height:1.72;white-space:pre-wrap;word-break:break-word;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;}
+.field.reason .prose{border-left:3px solid var(--teal);background:#fbfbf7;}
+.field.reason .fkey{color:var(--teal-d);}
+.field.answer .fkey{color:var(--amber);}
+.inline{font-size:15px;line-height:1.6;}
+.list{margin:0;padding-left:20px;font-size:14px;line-height:1.7;}
+.pre{font-family:'IBM Plex Mono',monospace;font-size:12.5px;line-height:1.6;background:#2a2e38;color:#e6e1d4;border-radius:10px;padding:14px;overflow-x:auto;}
+.muted{color:var(--ink3);}
+.idbadge{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:500;padding:4px 11px;border-radius:7px;background:var(--paper2);border:1px solid var(--line2);color:var(--ink2);}
+.label-chip{display:inline-block;font-family:'Fraunces',serif;font-size:17px;font-weight:600;padding:7px 16px;border-radius:10px;background:var(--amber-soft);color:#8a520f;border:1px solid #e2cda3;}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden;}
+@media (max-width:560px){ .grid{grid-template-columns:1fr;} }
+.grid .cell{background:var(--card);padding:9px 14px;display:flex;align-items:baseline;justify-content:space-between;gap:12px;}
+.grid .mk{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--ink2);}
+.grid .mv{font-size:13.5px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;}
+
+/* ── 评分面板 ── */
+.panel{background:var(--card);border-left:1px solid var(--line2);padding:22px 22px 40px;overflow-y:auto;}
+@media (max-width:880px){ .panel{border-left:none;border-top:1px solid var(--line2);} }
+.panel-htop{display:flex;justify-content:space-between;align-items:center;}
+.panel-h{font-family:'Fraunces',serif;font-size:17px;font-weight:600;}
+.panel-sub{font-size:12px;color:var(--ink2);margin:4px 0 20px;}
+.done-flag{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--teal-d);background:var(--teal-soft);padding:3px 9px;border-radius:99px;}
+.done-flag svg{width:13px;height:13px;}
+.dim{margin-bottom:22px;}
+.dim-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:6px;}
+.dim-name{font-size:14.5px;font-weight:600;}
+.dim-en{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;}
+.dim-desc{font-size:12px;color:var(--ink2);margin-bottom:10px;line-height:1.5;}
+.scale{display:flex;gap:6px;}
+.dot{flex:1;height:38px;border-radius:8px;border:1px solid var(--line2);background:var(--paper);font-family:'IBM Plex Mono',monospace;font-size:14px;color:var(--ink2);cursor:pointer;transition:all .12s ease;}
+.dot:hover{border-color:var(--teal);}
+.dot.sel{color:#fbf9f4;font-weight:600;border-color:transparent;transform:translateY(-1px);}
+.dim.teal .dot.sel{background:var(--teal);box-shadow:0 2px 0 var(--teal-d);}
+.dim.amber .dot.sel{background:var(--amber);box-shadow:0 2px 0 #7d4a0e;}
+.anchors{display:flex;justify-content:space-between;font-size:10.5px;color:var(--ink3);margin-top:5px;}
+.comment{width:100%;min-height:84px;resize:vertical;font-family:inherit;font-size:13.5px;line-height:1.6;padding:11px 12px;border:1px solid var(--line2);border-radius:10px;background:var(--paper);color:var(--ink);outline:none;}
+.comment:focus{border-color:var(--teal);}
+.saved-note{font-size:11px;color:var(--ink3);margin-top:14px;display:flex;align-items:center;gap:5px;}
+.saved-note svg{width:12px;height:12px;}
+.kbd{font-family:'IBM Plex Mono',monospace;font-size:10px;background:var(--paper2);border:1px solid var(--line2);border-radius:4px;padding:1px 5px;}
+.hidden{display:none !important;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/><path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4"/><circle cx="20" cy="10" r="2"/></svg></div>
+  <div>
+    <div class="title">临床推理评估台</div>
+    <div class="sub">由医生对模型 / 文本的推理质量进行打分</div>
+  </div>
+  <div class="spacer"></div>
+  <div id="topctrl" class="hidden" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <input id="evaluator" class="namebox" placeholder="评估者姓名（可选）" />
+    <div class="prog-wrap"><div class="bar"><span id="progbar"></span></div><span class="pcount" id="pcount">0/0 已评</span></div>
+    <button class="btn btn-primary" id="btnExport" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>导出 JSON</button>
+  </div>
+</header>
+
+<div id="err" class="err hidden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span id="errmsg"></span></div>
+
+<!-- 自动读取失败时的降级界面 -->
+<div id="emptyState" class="empty-state hidden">
+  <h2 class="serif">无法自动读取数据</h2>
+  <p class="lead" id="emptyMsg">页面尝试自动读取 <span class="mono" id="dataUrlLabel">data.json</span> 失败。<br>这通常是因为直接双击打开了文件——浏览器不允许本地网页读取本地文件。</p>
+  <div class="fmt" style="text-align:left;white-space:pre-wrap;">解决办法（任选其一）：
+1）把本文件和 data.json 放到服务器 / 内网 / 静态托管上访问；
+2）在数据所在文件夹运行：python -m http.server
+   然后浏览器打开 http://localhost:8000
+
+或者临时手动选择文件 ↓</div>
+  <div class="drop" id="drop" style="margin-top:16px;">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+    <h3>点击选择 data.json</h3>
+    <p>支持 .json — 顶层为数组，或包含数组字段的对象</p>
+  </div>
+  <input id="fileInput" type="file" accept=".json,application/json" hidden />
+</div>
+
+<!-- 已加载 -->
+<div id="loaded" class="hidden" style="display:flex;flex-direction:column;flex:1 1 auto;min-height:0;">
+  <div class="strip">
+    <div class="nav">
+      <button id="prevBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <button id="nextBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>
+    </div>
+    <span class="count" id="caseCount"></span>
+    <div class="chips" id="chips"></div>
+  </div>
+  <div class="fieldbar" id="fieldbar"><span class="fieldbar-l">显示字段</span></div>
+  <div class="main">
+    <section class="content" id="content"></section>
+    <aside class="panel">
+      <div class="panel-htop"><div class="panel-h">评分</div><span id="doneFlag"></span></div>
+      <div class="panel-sub">1 = 很差　·　5 = 优秀</div>
+      <div id="dims"></div>
+      <div class="dim">
+        <div class="dim-top"><span class="dim-name">补充评语</span><span class="dim-en">可选</span></div>
+        <textarea class="comment" id="comment" placeholder="记录关键问题、优点或修改建议……"></textarea>
+      </div>
+      <div class="saved-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>评分自动保存　·　用 <span class="kbd">←</span> <span class="kbd">→</span> 翻页</div>
+    </aside>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   ▼▼▼  数据来源设置  ▼▼▼
+   网页打开后会自动从 DATA_URL 读取 JSON。
+   - 同目录文件：  "./data.json"
+   - 子目录：      "./data/cases.json"
+   - 完整网址：    "https://你的域名/path/data.json"
+   注意：必须通过 http(s) 访问（服务器或 python -m http.server），
+   直接双击打开的 file:// 网页无法自动读取，会退回到手动选择。
+   ============================================================ */
+const DATA_URL = "./data.json";
+/* ▲▲▲  设置结束  ▲▲▲ */
+
+// ── 配置 ──
+const DIMENSIONS = [
+  { key:"accuracy",     label:"准确性", en:"Accuracy",     desc:"推理中的医学事实与判断是否正确", tone:"teal" },
+  { key:"logic",        label:"逻辑性", en:"Logic",        desc:"推理步骤是否连贯、因果是否成立", tone:"teal" },
+  { key:"completeness", label:"完整性", en:"Completeness", desc:"是否覆盖关键鉴别诊断与考量",     tone:"teal" },
+  { key:"safety",       label:"安全性", en:"Safety",       desc:"是否存在可能危害患者的疏漏",     tone:"amber" },
+];
+const SCALE = [1,2,3,4,5];
+const DEFAULT_FIELDS = ["id","features","label","rationale"];
+const FIELD_ORDER = ["id","idx","features","question","note","label","prediction","rationale","decision_path"];
+const REASON_HINTS = ["reason","rationale","thinking","thought","cot","推理","思路","分析","chain"];
+const QUESTION_HINTS = ["question","prompt","query","问题","病例","case","input","vignette"];
+const ANSWER_HINTS = ["answer","conclusion","diagnosis","答案","结论","诊断","output","label","gold"];
+const LS_KEY = "reasoning_eval_state_v1";
+
+// ── 状态 ──
+let cases = null, fileName = "", idx = 0;
+let evals = {};            // { i: {accuracy,logic,completeness,safety,comment} }
+let availableKeys = [], selectedFields = [];
+
+// ── DOM ──
+const $ = id => document.getElementById(id);
+const els = {
+  emptyState:$("emptyState"), loaded:$("loaded"), drop:$("drop"), fileInput:$("fileInput"),
+  emptyMsg:$("emptyMsg"), dataUrlLabel:$("dataUrlLabel"),
+  topctrl:$("topctrl"), evaluator:$("evaluator"), progbar:$("progbar"), pcount:$("pcount"),
+  btnExport:$("btnExport"), err:$("err"), errmsg:$("errmsg"),
+  prevBtn:$("prevBtn"), nextBtn:$("nextBtn"), caseCount:$("caseCount"), chips:$("chips"),
+  fieldbar:$("fieldbar"), content:$("content"), dims:$("dims"), comment:$("comment"),
+  doneFlag:$("doneFlag"),
+};
+
+// ── 工具 ──
+function classifyKey(k){
+  const lk = String(k).toLowerCase();
+  if(lk==="id"||lk==="idx") return "id";
+  if(REASON_HINTS.some(h=>lk.includes(h))) return "reason";
+  if(ANSWER_HINTS.some(h=>lk.includes(h))) return "answer";
+  if(QUESTION_HINTS.some(h=>lk.includes(h))) return "question";
+  return "plain";
+}
+function normalizeCases(data){
+  if(Array.isArray(data)) return data;
+  if(data && typeof data==="object"){
+    const arr = Object.values(data).find(v=>Array.isArray(v));
+    return arr ? arr : [data];
+  }
+  return [data];
+}
+function unionKeys(list){
+  const keys = [];
+  list.forEach(c=>{ if(c&&typeof c==="object"&&!Array.isArray(c)) Object.keys(c).forEach(k=>{ if(!keys.includes(k)) keys.push(k); }); });
+  return keys;
+}
+function orderFields(fields){
+  return [...fields].sort((a,b)=>{
+    const ia=FIELD_ORDER.indexOf(a), ib=FIELD_ORDER.indexOf(b);
+    return (ia<0?999:ia)-(ib<0?999:ib);
+  });
+}
+function esc(s){ return String(s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function fullyScored(e){ return e && DIMENSIONS.every(d=>e[d.key]!=null); }
+function doneCount(){ return Object.keys(evals).filter(i=>fullyScored(evals[i])).length; }
+
+// ── 持久化 ──
+function saveState(){
+  try{
+    localStorage.setItem(LS_KEY, JSON.stringify({
+      fileName, evaluator:els.evaluator.value, idx, evals,
+      selectedFields, availableKeys, total: cases?cases.length:0, savedAt:Date.now()
+    }));
+  }catch(e){/* 隐私模式等场景静默降级 */}
+}
+function loadSavedMeta(){
+  try{ const raw=localStorage.getItem(LS_KEY); return raw?JSON.parse(raw):null; }catch(e){ return null; }
+}
+
+// ── 字段值渲染 ──
+function renderValue(value){
+  if(value===null||value===undefined) return '<span class="muted">—</span>';
+  if(typeof value==="string"){
+    const long = value.length>100 || value.includes("\n");
+    return long ? '<div class="prose">'+esc(value)+'</div>' : '<span class="inline">'+esc(value)+'</span>';
+  }
+  if(typeof value==="number"||typeof value==="boolean") return '<span class="inline">'+esc(value)+'</span>';
+  if(Array.isArray(value) && value.every(v=>v===null||typeof v!=="object")){
+    return '<ul class="list">'+value.map(v=>'<li>'+esc(v)+'</li>').join("")+'</ul>';
+  }
+  if(value && typeof value==="object" && !Array.isArray(value)){
+    const entries = Object.entries(value);
+    if(entries.every(([,vv])=>vv===null||typeof vv!=="object")){
+      return '<div class="grid">'+entries.map(([mk,mv])=>
+        '<div class="cell"><span class="mk">'+esc(mk)+'</span><span class="mv">'+(mv===null?"—":esc(mv))+'</span></div>'
+      ).join("")+'</div>';
+    }
+  }
+  return '<pre class="pre">'+esc(JSON.stringify(value,null,2))+'</pre>';
+}
+
+const BRAIN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5a3 3 0 1 0-5.997.142 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.142 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/></svg>';
+const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+const CHECKCIRC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>';
+
+// ── 渲染内容区 ──
+function renderContent(){
+  const cur = cases[idx];
+  els.content.innerHTML = "";
+  let fields;
+  if(cur && typeof cur==="object" && !Array.isArray(cur)){
+    fields = orderFields(selectedFields.filter(k=>k in cur));
+  }else{
+    fields = null;
+  }
+  if(fields===null){
+    const d=document.createElement("div"); d.className="field";
+    d.innerHTML='<div class="fkey">内容</div>'+renderValue(cur);
+    els.content.appendChild(d); return;
+  }
+  fields.forEach((k,n)=>{
+    const cls = classifyKey(k); const v = cur[k];
+    const d=document.createElement("div"); d.className="field "+cls; d.style.animationDelay=(n*0.04)+"s";
+    let body;
+    if(cls==="id") body='<span class="idbadge">#'+esc(v)+'</span>';
+    else if(cls==="answer" && typeof v==="string" && v.length<60) body='<span class="label-chip">'+esc(v)+'</span>';
+    else if(cls==="reason" && typeof v==="string") body='<div class="prose">'+esc(v)+'</div>';
+    else body=renderValue(v);
+    d.innerHTML='<div class="fkey">'+(cls==="reason"?BRAIN:"")+esc(k)+'</div>'+body;
+    els.content.appendChild(d);
+  });
+  els.content.scrollTop=0;
+}
+
+// ── 渲染评分面板 ──
+function renderPanel(){
+  const e = evals[idx] || {};
+  els.dims.innerHTML = DIMENSIONS.map(d=>{
+    const dots = SCALE.map(n=>'<button class="dot'+(e[d.key]===n?" sel":"")+'" data-dim="'+d.key+'" data-val="'+n+'">'+n+'</button>').join("");
+    return '<div class="dim '+d.tone+'">'+
+      '<div class="dim-top"><span class="dim-name">'+d.label+'</span><span class="dim-en">'+d.en+'</span></div>'+
+      '<div class="dim-desc">'+d.desc+'</div>'+
+      '<div class="scale">'+dots+'</div>'+
+      '<div class="anchors"><span>很差</span><span>优秀</span></div>'+
+    '</div>';
+  }).join("");
+  els.dims.querySelectorAll(".dot").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      const dim=btn.dataset.dim, val=+btn.dataset.val;
+      evals[idx]=Object.assign({}, evals[idx], {[dim]:val});
+      renderPanel(); renderChips(); updateProgress(); saveState();
+    });
+  });
+  els.comment.value = e.comment || "";
+  els.doneFlag.innerHTML = fullyScored(e) ? '<span class="done-flag">'+CHECKCIRC+' 已完成</span>' : "";
+}
+
+// ── 渲染病例条 ──
+function renderChips(){
+  els.caseCount.textContent = "病例 "+(idx+1)+" / "+cases.length;
+  els.chips.innerHTML = cases.map((_,i)=>{
+    const done = fullyScored(evals[i]);
+    const cls = "chip"+(i===idx?" active":"")+(done?" done":"");
+    const inner = (done && i!==idx) ? CHECK : (i+1);
+    return '<button class="'+cls+'" data-i="'+i+'">'+inner+'</button>';
+  }).join("");
+  els.chips.querySelectorAll(".chip").forEach(c=>c.addEventListener("click",()=>goTo(+c.dataset.i)));
+  els.prevBtn.disabled = idx===0;
+  els.nextBtn.disabled = idx===cases.length-1;
+}
+
+// ── 渲染字段开关 ──
+function renderFieldbar(){
+  els.fieldbar.querySelectorAll(".tog").forEach(t=>t.remove());
+  orderFields(availableKeys).forEach(k=>{
+    const b=document.createElement("button");
+    b.className="tog"+(selectedFields.includes(k)?" on":""); b.textContent=k;
+    b.addEventListener("click",()=>{
+      if(selectedFields.includes(k)) selectedFields=selectedFields.filter(x=>x!==k);
+      else selectedFields.push(k);
+      renderFieldbar(); renderContent(); saveState();
+    });
+    els.fieldbar.appendChild(b);
+  });
+}
+
+function updateProgress(){
+  const dc=doneCount(), t=cases.length;
+  els.progbar.style.width = (t?Math.round(dc/t*100):0)+"%";
+  els.pcount.textContent = dc+"/"+t+" 已评";
+  els.btnExport.disabled = dc===0;
+}
+
+function goTo(i){
+  idx = Math.max(0, Math.min(cases.length-1, i));
+  renderContent(); renderPanel(); renderChips(); saveState();
+}
+
+// ── 加载文件 ──
+function applyCases(list, fname, restored){
+  cases = list; fileName = fname;
+  availableKeys = unionKeys(list);
+  if(restored && restored.selectedFields && restored.selectedFields.length){
+    selectedFields = restored.selectedFields.filter(k=>availableKeys.includes(k));
+  }else{
+    const def = DEFAULT_FIELDS.filter(k=>availableKeys.includes(k));
+    selectedFields = def.length?def:availableKeys.slice();
+  }
+  if(restored && restored.evals){ evals = restored.evals; idx = restored.idx||0; }
+  else { evals = {}; idx = 0; }
+  els.emptyState.classList.add("hidden");
+  els.loaded.classList.remove("hidden");
+  els.topctrl.classList.remove("hidden");
+  renderFieldbar(); renderContent(); renderPanel(); renderChips(); updateProgress(); saveState();
+}
+
+function showErr(m){ els.errmsg.textContent=m; els.err.classList.remove("hidden"); }
+function hideErr(){ els.err.classList.add("hidden"); }
+
+// ── 导出 ──
+function exportJSON(){
+  const results = cases.map((c,i)=>{
+    const e = evals[i]||{}; const scores={};
+    DIMENSIONS.forEach(d=>{ scores[d.label]= e[d.key]!=null ? e[d.key] : null; });
+    return { index:i, source:c, scores, comment:e.comment||"", complete:fullyScored(e) };
+  });
+  const summary={};
+  DIMENSIONS.forEach(d=>{
+    const vals=results.map(r=>r.scores[d.label]).filter(v=>v!=null);
+    summary[d.label]= vals.length ? +(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(2) : null;
+  });
+  const payload={
+    evaluator: els.evaluator.value||null,
+    exportedAt:new Date().toISOString(),
+    totalCases:cases.length, scoredCases:doneCount(),
+    dimensions:DIMENSIONS.map(d=>({key:d.key,label:d.label,scale:"1-5"})),
+    averageScores:summary, results
+  };
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob); const a=document.createElement("a");
+  const who = (els.evaluator.value||"").trim().replace(/[\\/:*?"<>|\s]+/g,"_");
+  a.href=url; a.download="评分"+(who?"_"+who:"")+"_"+new Date().toISOString().slice(0,10)+".json"; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── 事件绑定 ──
+els.prevBtn.addEventListener("click",()=>goTo(idx-1));
+els.nextBtn.addEventListener("click",()=>goTo(idx+1));
+els.btnExport.addEventListener("click",exportJSON);
+els.comment.addEventListener("input",()=>{ evals[idx]=Object.assign({}, evals[idx], {comment:els.comment.value}); saveState(); });
+els.evaluator.addEventListener("input",saveState);
+document.addEventListener("keydown",e=>{
+  if(!cases) return;
+  const tag=document.activeElement&&document.activeElement.tagName;
+  if(tag==="TEXTAREA"||tag==="INPUT") return;
+  if(e.key==="ArrowLeft") goTo(idx-1);
+  if(e.key==="ArrowRight") goTo(idx+1);
+});
+
+// ── 手动选择文件（降级方案）──
+function ingest(file){
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=()=>{
+    try{
+      const list=normalizeCases(JSON.parse(reader.result));
+      if(!list.length) throw new Error("文件中没有可评估的条目");
+      start(list);
+    }catch(err){ els.emptyMsg.textContent="无法解析该文件，请确认是有效的 JSON："+err.message; }
+  };
+  reader.readAsText(file);
+}
+els.fileInput.addEventListener("change",e=>{ ingest(e.target.files[0]); e.target.value=""; });
+els.drop.addEventListener("click",()=>els.fileInput.click());
+els.drop.addEventListener("dragover",e=>{ e.preventDefault(); els.drop.classList.add("drag"); });
+els.drop.addEventListener("dragleave",()=>els.drop.classList.remove("drag"));
+els.drop.addEventListener("drop",e=>{ e.preventDefault(); els.drop.classList.remove("drag"); ingest(e.dataTransfer.files[0]); });
+
+// ── 应用一份数据（含按条数恢复本浏览器进度）──
+function start(list){
+  const saved = loadSavedMeta();
+  const restored = (saved && saved.total===list.length) ? saved : null;
+  applyCases(list, DATA_URL, restored);
+}
+
+// ── 启动：自动从 DATA_URL 读取，失败则降级到手动选择 ──
+(function init(){
+  els.dataUrlLabel.textContent = DATA_URL;
+  fetch(DATA_URL, {cache:"no-store"})
+    .then(r=>{ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
+    .then(data=>{
+      const list = normalizeCases(data);
+      if(!list.length) throw new Error("数据为空");
+      start(list);
+    })
+    .catch(err=>{
+      els.emptyState.classList.remove("hidden");
+      console.warn("自动读取失败：", err.message);
+    });
+})();
+</script>
+</body>
+</html>
+
