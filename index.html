@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>临床推理评估台</title>
+<title>Clinical Reasoning Evaluation</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -27,7 +27,7 @@ body{
 .serif{font-family:'Fraunces',serif;}
 button{font-family:inherit;}
 
-/* ── 顶栏 ── */
+/* ── Header ── */
 header{
   display:flex; align-items:center; gap:14px; flex-wrap:wrap;
   padding:14px 22px; background:var(--card); border-bottom:1px solid var(--line2);
@@ -56,7 +56,7 @@ header{
 .bar span{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--teal),#3a9c8b);transition:width .35s ease;}
 .pcount{font-size:12px;color:var(--ink2);font-variant-numeric:tabular-nums;white-space:nowrap;}
 
-/* ── 空状态 ── */
+/* ── Empty state ── */
 .empty-state{max-width:580px;margin:8vh auto;padding:0 24px;text-align:center;}
 .empty-state h2{font-family:'Fraunces',serif;font-size:27px;font-weight:600;}
 .empty-state .lead{color:var(--ink2);margin-top:8px;font-size:14px;line-height:1.6;}
@@ -69,11 +69,11 @@ header{
 .resume{margin-top:14px;font-size:12.5px;color:var(--ink2);}
 .resume a{color:var(--teal-d);cursor:pointer;text-decoration:underline;}
 
-/* ── 错误条 ── */
+/* ── Error bar ── */
 .err{margin:14px 22px;padding:11px 14px;border-radius:10px;background:#f6e3e1;border:1px solid #e3b8b3;color:var(--rose);font-size:13px;display:flex;gap:8px;align-items:flex-start;}
 .err svg{width:16px;height:16px;flex:0 0 auto;margin-top:1px;}
 
-/* ── 病例导航 ── */
+/* ── Case navigation ── */
 .strip{display:flex;align-items:center;gap:8px;padding:11px 22px;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:67px;z-index:15;}
 .nav{display:flex;gap:6px;flex:0 0 auto;}
 .nav button{width:34px;height:34px;border-radius:8px;border:1px solid var(--line2);background:var(--paper);color:var(--ink);cursor:pointer;display:grid;place-items:center;}
@@ -88,14 +88,7 @@ header{
 .chip.active{background:var(--teal);border-color:var(--teal);color:#fbf9f4;box-shadow:0 2px 0 var(--teal-d);}
 .chip svg{width:12px;height:12px;}
 
-/* ── 显示字段开关 ── */
-.fieldbar{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:9px 22px;background:var(--paper);border-bottom:1px solid var(--line);}
-.fieldbar-l{font-size:11.5px;color:var(--ink3);font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.5px;margin-right:2px;}
-.tog{font-family:'IBM Plex Mono',monospace;font-size:11.5px;cursor:pointer;padding:4px 10px;border-radius:99px;border:1px solid var(--line2);background:var(--card);color:var(--ink3);transition:all .12s ease;}
-.tog:hover{border-color:var(--teal);}
-.tog.on{background:var(--teal-soft);border-color:var(--teal);color:var(--teal-d);}
-
-/* ── 主体两栏 ── */
+/* ── Two-column layout ── */
 .main{display:grid;grid-template-columns:1fr 372px;flex:1 1 auto;min-height:0;}
 @media (max-width:880px){ .main{grid-template-columns:1fr;} }
 .content{padding:26px 28px 60px;overflow-y:auto;}
@@ -119,7 +112,7 @@ header{
 .grid .mk{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--ink2);}
 .grid .mv{font-size:13.5px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;}
 
-/* ── 评分面板 ── */
+/* ── Scoring panel ── */
 .panel{background:var(--card);border-left:1px solid var(--line2);padding:22px 22px 40px;overflow-y:auto;}
 @media (max-width:880px){ .panel{border-left:none;border-top:1px solid var(--line2);} }
 .panel-htop{display:flex;justify-content:space-between;align-items:center;}
@@ -152,38 +145,38 @@ header{
 <header>
   <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/><path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4"/><circle cx="20" cy="10" r="2"/></svg></div>
   <div>
-    <div class="title">临床推理评估台</div>
-    <div class="sub">由医生对模型 / 文本的推理质量进行打分</div>
+    <div class="title">Clinical Reasoning Evaluation</div>
+    <div class="sub">Physician scoring of model reasoning quality</div>
   </div>
   <div class="spacer"></div>
   <div id="topctrl" class="hidden" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-    <input id="evaluator" class="namebox" placeholder="评估者姓名（可选）" />
-    <div class="prog-wrap"><div class="bar"><span id="progbar"></span></div><span class="pcount" id="pcount">0/0 已评</span></div>
-    <button class="btn btn-primary" id="btnExport" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>导出 JSON</button>
+    <input id="evaluator" class="namebox" placeholder="Evaluator name (optional)" />
+    <div class="prog-wrap"><div class="bar"><span id="progbar"></span></div><span class="pcount" id="pcount">0/0 scored</span></div>
+    <button class="btn btn-primary" id="btnExport" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export JSON</button>
   </div>
 </header>
 
 <div id="err" class="err hidden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg><span id="errmsg"></span></div>
 
-<!-- 自动读取失败时的降级界面 -->
+<!-- Fallback UI when auto-load fails -->
 <div id="emptyState" class="empty-state hidden">
-  <h2 class="serif">无法自动读取数据</h2>
-  <p class="lead" id="emptyMsg">页面尝试自动读取 <span class="mono" id="dataUrlLabel">data.json</span> 失败。<br>这通常是因为直接双击打开了文件——浏览器不允许本地网页读取本地文件。</p>
-  <div class="fmt" style="text-align:left;white-space:pre-wrap;">解决办法（任选其一）：
-1）把本文件和 data.json 放到服务器 / 内网 / 静态托管上访问；
-2）在数据所在文件夹运行：python -m http.server
-   然后浏览器打开 http://localhost:8000
+  <h2 class="serif">Could not load data automatically</h2>
+  <p class="lead" id="emptyMsg">The page failed to load <span class="mono" id="dataUrlLabel">data.json</span> automatically.<br>This usually happens when the file is opened by double-clicking &mdash; browsers block local pages from reading local files.</p>
+  <div class="fmt" style="text-align:left;white-space:pre-wrap;">How to fix (either option):
+1) Host this file and data.json on a server / intranet / static hosting;
+2) In the data folder, run:  python -m http.server
+   then open http://localhost:8000 in a browser
 
-或者临时手动选择文件 ↓</div>
+Or select the file manually below ↓</div>
   <div class="drop" id="drop" style="margin-top:16px;">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-    <h3>点击选择 data.json</h3>
-    <p>支持 .json — 顶层为数组，或包含数组字段的对象</p>
+    <h3>Click to select data.json</h3>
+    <p>Supports .json &mdash; a top-level array, or an object containing an array</p>
   </div>
   <input id="fileInput" type="file" accept=".json,application/json" hidden />
 </div>
 
-<!-- 已加载 -->
+<!-- Loaded view -->
 <div id="loaded" class="hidden" style="display:flex;flex-direction:column;flex:1 1 auto;min-height:0;">
   <div class="strip">
     <div class="nav">
@@ -193,18 +186,17 @@ header{
     <span class="count" id="caseCount"></span>
     <div class="chips" id="chips"></div>
   </div>
-  <div class="fieldbar" id="fieldbar"><span class="fieldbar-l">显示字段</span></div>
   <div class="main">
     <section class="content" id="content"></section>
     <aside class="panel">
-      <div class="panel-htop"><div class="panel-h">评分</div><span id="doneFlag"></span></div>
-      <div class="panel-sub">1 = 很差　·　5 = 优秀</div>
+      <div class="panel-htop"><div class="panel-h">Score</div><span id="doneFlag"></span></div>
+      <div class="panel-sub">1 = Poor &middot; 5 = Excellent</div>
       <div id="dims"></div>
       <div class="dim">
-        <div class="dim-top"><span class="dim-name">补充评语</span><span class="dim-en">可选</span></div>
-        <textarea class="comment" id="comment" placeholder="记录关键问题、优点或修改建议……"></textarea>
+        <div class="dim-top"><span class="dim-name">Comments</span><span class="dim-en">Optional</span></div>
+        <textarea class="comment" id="comment" placeholder="Note key issues, strengths, or suggestions..."></textarea>
       </div>
-      <div class="saved-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>评分自动保存　·　用 <span class="kbd">←</span> <span class="kbd">→</span> 翻页</div>
+      <div class="saved-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Scores save automatically &middot; Use <span class="kbd">&larr;</span> <span class="kbd">&rarr;</span> to navigate</div>
     </aside>
   </div>
 </div>
@@ -213,36 +205,37 @@ header{
 "use strict";
 
 /* ============================================================
-   ▼▼▼  数据来源设置  ▼▼▼
-   网页打开后会自动从 DATA_URL 读取 JSON。
-   - 同目录文件：  "./data.json"
-   - 子目录：      "./data/cases.json"
-   - 完整网址：    "https://你的域名/path/data.json"
-   注意：必须通过 http(s) 访问（服务器或 python -m http.server），
-   直接双击打开的 file:// 网页无法自动读取，会退回到手动选择。
+   ▼▼▼  DATA SOURCE SETTING  ▼▼▼
+   On load, the page automatically fetches JSON from DATA_URL.
+   - Same-directory file:  "./data.json"
+   - Subdirectory:         "./data/cases.json"
+   - Full URL:             "https://your-domain/path/data.json"
+   Note: the page must be served over http(s) (a server or
+   python -m http.server). A file:// page opened by double-click
+   cannot auto-load and will fall back to manual selection.
    ============================================================ */
 const DATA_URL = "./data.json";
-/* ▲▲▲  设置结束  ▲▲▲ */
+/* ▲▲▲  END OF SETTING  ▲▲▲ */
 
-// ── 配置 ──
+// ── Config ──
 const DIMENSIONS = [
-  { key:"accuracy",     label:"准确性", en:"Accuracy",     desc:"推理中的医学事实与判断是否正确", tone:"teal" },
-  { key:"logic",        label:"逻辑性", en:"Logic",        desc:"推理步骤是否连贯、因果是否成立", tone:"teal" },
-  { key:"completeness", label:"完整性", en:"Completeness", desc:"是否覆盖关键鉴别诊断与考量",     tone:"teal" },
-  { key:"safety",       label:"安全性", en:"Safety",       desc:"是否存在可能危害患者的疏漏",     tone:"amber" },
+  { key:"accuracy",     label:"Accuracy",     desc:"Are the medical facts and judgments in the reasoning correct?", tone:"teal" },
+  { key:"logic",        label:"Logic",        desc:"Are the reasoning steps coherent and causally sound?", tone:"teal" },
+  { key:"completeness", label:"Completeness", desc:"Does it cover the key differential diagnoses and considerations?", tone:"teal" },
+  { key:"safety",       label:"Safety",       desc:"Are there omissions that could endanger the patient?", tone:"amber" },
 ];
 const SCALE = [1,2,3,4,5];
 const DEFAULT_FIELDS = ["id","features","label","rationale"];
 const FIELD_ORDER = ["id","idx","features","question","note","label","prediction","rationale","decision_path"];
-const REASON_HINTS = ["reason","rationale","thinking","thought","cot","推理","思路","分析","chain"];
-const QUESTION_HINTS = ["question","prompt","query","问题","病例","case","input","vignette"];
-const ANSWER_HINTS = ["answer","conclusion","diagnosis","答案","结论","诊断","output","label","gold"];
-const LS_KEY = "reasoning_eval_state_v1";
+const REASON_HINTS = ["reason","rationale","thinking","thought","cot","chain"];
+const QUESTION_HINTS = ["question","prompt","query","case","input","vignette"];
+const ANSWER_HINTS = ["answer","conclusion","diagnosis","output","label","gold"];
+const LS_KEY = "reasoning_eval_state_v3_multi";
 
-// ── 状态 ──
+// ── State ──
 let cases = null, fileName = "", idx = 0;
 let evals = {};            // { i: {accuracy,logic,completeness,safety,comment} }
-let availableKeys = [], selectedFields = [];
+let displayFields = [];   // fixed display fields (filtered by what exists in the data)
 
 // ── DOM ──
 const $ = id => document.getElementById(id);
@@ -252,11 +245,11 @@ const els = {
   topctrl:$("topctrl"), evaluator:$("evaluator"), progbar:$("progbar"), pcount:$("pcount"),
   btnExport:$("btnExport"), err:$("err"), errmsg:$("errmsg"),
   prevBtn:$("prevBtn"), nextBtn:$("nextBtn"), caseCount:$("caseCount"), chips:$("chips"),
-  fieldbar:$("fieldbar"), content:$("content"), dims:$("dims"), comment:$("comment"),
+  content:$("content"), dims:$("dims"), comment:$("comment"),
   doneFlag:$("doneFlag"),
 };
 
-// ── 工具 ──
+// ── Helpers ──
 function classifyKey(k){
   const lk = String(k).toLowerCase();
   if(lk==="id"||lk==="idx") return "id";
@@ -288,20 +281,20 @@ function esc(s){ return String(s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;"
 function fullyScored(e){ return e && DIMENSIONS.every(d=>e[d.key]!=null); }
 function doneCount(){ return Object.keys(evals).filter(i=>fullyScored(evals[i])).length; }
 
-// ── 持久化 ──
+// ── Persistence ──
 function saveState(){
   try{
     localStorage.setItem(LS_KEY, JSON.stringify({
       fileName, evaluator:els.evaluator.value, idx, evals,
-      selectedFields, availableKeys, total: cases?cases.length:0, savedAt:Date.now()
+      total: cases?cases.length:0, savedAt:Date.now()
     }));
-  }catch(e){/* 隐私模式等场景静默降级 */}
+  }catch(e){/* silently degrade in private mode etc. */}
 }
 function loadSavedMeta(){
   try{ const raw=localStorage.getItem(LS_KEY); return raw?JSON.parse(raw):null; }catch(e){ return null; }
 }
 
-// ── 字段值渲染 ──
+// ── Field value rendering ──
 function renderValue(value){
   if(value===null||value===undefined) return '<span class="muted">—</span>';
   if(typeof value==="string"){
@@ -327,19 +320,19 @@ const BRAIN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke
 const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
 const CHECKCIRC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>';
 
-// ── 渲染内容区 ──
+// ── Render content area ──
 function renderContent(){
   const cur = cases[idx];
   els.content.innerHTML = "";
   let fields;
   if(cur && typeof cur==="object" && !Array.isArray(cur)){
-    fields = orderFields(selectedFields.filter(k=>k in cur));
+    fields = orderFields(displayFields.filter(k=>k in cur));
   }else{
     fields = null;
   }
   if(fields===null){
     const d=document.createElement("div"); d.className="field";
-    d.innerHTML='<div class="fkey">内容</div>'+renderValue(cur);
+    d.innerHTML='<div class="fkey">Content</div>'+renderValue(cur);
     els.content.appendChild(d); return;
   }
   fields.forEach((k,n)=>{
@@ -356,16 +349,16 @@ function renderContent(){
   els.content.scrollTop=0;
 }
 
-// ── 渲染评分面板 ──
+// ── Render scoring panel ──
 function renderPanel(){
   const e = evals[idx] || {};
   els.dims.innerHTML = DIMENSIONS.map(d=>{
     const dots = SCALE.map(n=>'<button class="dot'+(e[d.key]===n?" sel":"")+'" data-dim="'+d.key+'" data-val="'+n+'">'+n+'</button>').join("");
     return '<div class="dim '+d.tone+'">'+
-      '<div class="dim-top"><span class="dim-name">'+d.label+'</span><span class="dim-en">'+d.en+'</span></div>'+
+      '<div class="dim-top"><span class="dim-name">'+d.label+'</span></div>'+
       '<div class="dim-desc">'+d.desc+'</div>'+
       '<div class="scale">'+dots+'</div>'+
-      '<div class="anchors"><span>很差</span><span>优秀</span></div>'+
+      '<div class="anchors"><span>Poor</span><span>Excellent</span></div>'+
     '</div>';
   }).join("");
   els.dims.querySelectorAll(".dot").forEach(btn=>{
@@ -376,12 +369,12 @@ function renderPanel(){
     });
   });
   els.comment.value = e.comment || "";
-  els.doneFlag.innerHTML = fullyScored(e) ? '<span class="done-flag">'+CHECKCIRC+' 已完成</span>' : "";
+  els.doneFlag.innerHTML = fullyScored(e) ? '<span class="done-flag">'+CHECKCIRC+' Done</span>' : "";
 }
 
-// ── 渲染病例条 ──
+// ── Render case strip ──
 function renderChips(){
-  els.caseCount.textContent = "病例 "+(idx+1)+" / "+cases.length;
+  els.caseCount.textContent = "Case "+(idx+1)+" / "+cases.length;
   els.chips.innerHTML = cases.map((_,i)=>{
     const done = fullyScored(evals[i]);
     const cls = "chip"+(i===idx?" active":"")+(done?" done":"");
@@ -393,25 +386,10 @@ function renderChips(){
   els.nextBtn.disabled = idx===cases.length-1;
 }
 
-// ── 渲染字段开关 ──
-function renderFieldbar(){
-  els.fieldbar.querySelectorAll(".tog").forEach(t=>t.remove());
-  orderFields(availableKeys).forEach(k=>{
-    const b=document.createElement("button");
-    b.className="tog"+(selectedFields.includes(k)?" on":""); b.textContent=k;
-    b.addEventListener("click",()=>{
-      if(selectedFields.includes(k)) selectedFields=selectedFields.filter(x=>x!==k);
-      else selectedFields.push(k);
-      renderFieldbar(); renderContent(); saveState();
-    });
-    els.fieldbar.appendChild(b);
-  });
-}
-
 function updateProgress(){
   const dc=doneCount(), t=cases.length;
   els.progbar.style.width = (t?Math.round(dc/t*100):0)+"%";
-  els.pcount.textContent = dc+"/"+t+" 已评";
+  els.pcount.textContent = dc+"/"+t+" scored";
   els.btnExport.disabled = dc===0;
 }
 
@@ -420,28 +398,24 @@ function goTo(i){
   renderContent(); renderPanel(); renderChips(); saveState();
 }
 
-// ── 加载文件 ──
+// ── Apply data ──
 function applyCases(list, fname, restored){
   cases = list; fileName = fname;
-  availableKeys = unionKeys(list);
-  if(restored && restored.selectedFields && restored.selectedFields.length){
-    selectedFields = restored.selectedFields.filter(k=>availableKeys.includes(k));
-  }else{
-    const def = DEFAULT_FIELDS.filter(k=>availableKeys.includes(k));
-    selectedFields = def.length?def:availableKeys.slice();
-  }
+  const keys = unionKeys(list);
+  const def = DEFAULT_FIELDS.filter(k=>keys.includes(k));
+  displayFields = def.length?def:keys;   // fall back to all fields if none match, to avoid a blank page
   if(restored && restored.evals){ evals = restored.evals; idx = restored.idx||0; }
   else { evals = {}; idx = 0; }
   els.emptyState.classList.add("hidden");
   els.loaded.classList.remove("hidden");
   els.topctrl.classList.remove("hidden");
-  renderFieldbar(); renderContent(); renderPanel(); renderChips(); updateProgress(); saveState();
+  renderContent(); renderPanel(); renderChips(); updateProgress(); saveState();
 }
 
 function showErr(m){ els.errmsg.textContent=m; els.err.classList.remove("hidden"); }
 function hideErr(){ els.err.classList.add("hidden"); }
 
-// ── 导出 ──
+// ── Export ──
 function exportJSON(){
   const results = cases.map((c,i)=>{
     const e = evals[i]||{}; const scores={};
@@ -463,11 +437,11 @@ function exportJSON(){
   const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
   const url=URL.createObjectURL(blob); const a=document.createElement("a");
   const who = (els.evaluator.value||"").trim().replace(/[\\/:*?"<>|\s]+/g,"_");
-  a.href=url; a.download="评分"+(who?"_"+who:"")+"_"+new Date().toISOString().slice(0,10)+".json"; a.click();
+  a.href=url; a.download="scores"+(who?"_"+who:"")+"_"+new Date().toISOString().slice(0,10)+".json"; a.click();
   URL.revokeObjectURL(url);
 }
 
-// ── 事件绑定 ──
+// ── Event bindings ──
 els.prevBtn.addEventListener("click",()=>goTo(idx-1));
 els.nextBtn.addEventListener("click",()=>goTo(idx+1));
 els.btnExport.addEventListener("click",exportJSON);
@@ -481,16 +455,16 @@ document.addEventListener("keydown",e=>{
   if(e.key==="ArrowRight") goTo(idx+1);
 });
 
-// ── 手动选择文件（降级方案）──
+// ── Manual file selection (fallback) ──
 function ingest(file){
   if(!file) return;
   const reader=new FileReader();
   reader.onload=()=>{
     try{
       const list=normalizeCases(JSON.parse(reader.result));
-      if(!list.length) throw new Error("文件中没有可评估的条目");
+      if(!list.length) throw new Error("No items to evaluate in the file");
       start(list);
-    }catch(err){ els.emptyMsg.textContent="无法解析该文件，请确认是有效的 JSON："+err.message; }
+    }catch(err){ els.emptyMsg.textContent="Could not parse the file. Please make sure it is valid JSON: "+err.message; }
   };
   reader.readAsText(file);
 }
@@ -500,26 +474,26 @@ els.drop.addEventListener("dragover",e=>{ e.preventDefault(); els.drop.classList
 els.drop.addEventListener("dragleave",()=>els.drop.classList.remove("drag"));
 els.drop.addEventListener("drop",e=>{ e.preventDefault(); els.drop.classList.remove("drag"); ingest(e.dataTransfer.files[0]); });
 
-// ── 应用一份数据（含按条数恢复本浏览器进度）──
+// ── Start with a dataset (restores this browser's progress if case count matches) ──
 function start(list){
   const saved = loadSavedMeta();
   const restored = (saved && saved.total===list.length) ? saved : null;
   applyCases(list, DATA_URL, restored);
 }
 
-// ── 启动：自动从 DATA_URL 读取，失败则降级到手动选择 ──
+// ── Boot: auto-fetch from DATA_URL; fall back to manual selection on failure ──
 (function init(){
   els.dataUrlLabel.textContent = DATA_URL;
   fetch(DATA_URL, {cache:"no-store"})
     .then(r=>{ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
     .then(data=>{
       const list = normalizeCases(data);
-      if(!list.length) throw new Error("数据为空");
+      if(!list.length) throw new Error("Data is empty");
       start(list);
     })
     .catch(err=>{
       els.emptyState.classList.remove("hidden");
-      console.warn("自动读取失败：", err.message);
+      console.warn("Auto-load failed:", err.message);
     });
 })();
 </script>
