@@ -80,9 +80,21 @@ header{
 .nav button:hover:not(:disabled){background:var(--paper2);}
 .nav button:disabled{opacity:.4;cursor:not-allowed;}
 .nav svg{width:18px;height:18px;}
-.count{font-size:13px;color:var(--ink2);font-variant-numeric:tabular-nums;white-space:nowrap;padding:0 4px;}
-.chips{display:flex;gap:6px;overflow-x:auto;padding:2px;flex:1 1 auto;}
-.chip{flex:0 0 auto;min-width:30px;height:30px;padding:0 7px;border-radius:7px;border:1px solid var(--line2);background:var(--paper);color:var(--ink2);font-size:12px;font-family:'IBM Plex Mono',monospace;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:3px;transition:all .12s ease;}
+.count{font-size:13px;color:var(--ink2);font-variant-numeric:tabular-nums;white-space:nowrap;padding:0 4px;font-weight:600;}
+.crumb{flex:1 1 auto;font-size:12px;color:var(--ink3);font-family:'IBM Plex Mono',monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.navgroups{background:var(--paper);border-bottom:1px solid var(--line);padding:8px 16px 12px;max-height:34vh;overflow-y:auto;}
+.navgroup{margin-top:6px;}
+.navg-head{display:flex;align-items:center;gap:8px;width:100%;text-align:left;cursor:pointer;background:none;border:none;padding:6px 4px;color:var(--ink);}
+.navg-head:hover{color:var(--teal-d);}
+.navg-caret{font-size:11px;color:var(--ink3);transition:transform .15s ease;display:inline-block;}
+.navg-caret.col{transform:rotate(-90deg);}
+.navg-name{font-size:13px;font-weight:600;letter-spacing:.2px;}
+.navg-count{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink3);background:var(--paper2);border:1px solid var(--line);border-radius:99px;padding:1px 8px;}
+.navsub{margin:2px 0 8px 18px;}
+.navsub-name{font-size:11px;color:var(--ink2);font-weight:500;margin:6px 0 5px;display:flex;align-items:center;gap:6px;}
+.navsub-count{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink3);}
+.chips{display:flex;flex-wrap:wrap;gap:6px;padding:1px;}
+.chip{flex:0 0 auto;min-width:30px;height:30px;padding:0 7px;border-radius:7px;border:1px solid var(--line2);background:var(--card);color:var(--ink2);font-size:12px;font-family:'IBM Plex Mono',monospace;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:3px;transition:all .12s ease;}
 .chip:hover{border-color:var(--teal);color:var(--ink);}
 .chip.done{background:var(--teal-soft);border-color:var(--teal);color:var(--teal-d);}
 .chip.active{background:var(--teal);border-color:var(--teal);color:#fbf9f4;box-shadow:0 2px 0 var(--teal-d);}
@@ -187,8 +199,9 @@ Or select the file manually below ↓</div>
       <button id="nextBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>
     </div>
     <span class="count" id="caseCount"></span>
-    <div class="chips" id="chips"></div>
+    <span class="crumb" id="crumb"></span>
   </div>
+  <div class="navgroups" id="navgroups"></div>
   <div class="main">
     <section class="content" id="content"></section>
     <aside class="panel">
@@ -252,12 +265,24 @@ const FEATURE_LABELS = {
   Entorhinal: "Entorhinal Volume (norm.)",
   MidTemp: "Middle Temporal Volume (norm.)",
 };
+
+// Two-level case grouping for the navigator.
+// Level 1: whether the features object contains any missing (null) value.
+// Level 2: the case label. Edit/reorder LABEL_ORDER as needed; any label not
+// listed here is shown after these, under its own section.
+const LABEL_ORDER = ["Normal Cognition", "Mild Cognitive Impairment", "Alzheimer's Disease"];
+const MISSING_GROUPS = [
+  { key: "complete", name: "No missing values" },
+  { key: "missing",  name: "Has missing values" },
+];
 const LS_KEY = "reasoning_eval_state_v3_multi";
 
 // ── State ──
 let cases = null, fileName = "", idx = 0;
 let evals = {};            // { i: {accuracy,logic,completeness,safety,comment} }
 let displayFields = [];   // fixed display fields (filtered by what exists in the data)
+let orderSeq = [];        // case indices in grouped display order (for prev/next)
+let collapsedGroups = {}; // { groupKey: true } when a level-1 group is collapsed
 
 // ── DOM ──
 const $ = id => document.getElementById(id);
@@ -266,7 +291,7 @@ const els = {
   emptyMsg:$("emptyMsg"), dataUrlLabel:$("dataUrlLabel"),
   topctrl:$("topctrl"), evaluator:$("evaluator"), progbar:$("progbar"), pcount:$("pcount"),
   btnExport:$("btnExport"), btnClearOne:$("btnClearOne"), btnClearAll:$("btnClearAll"), err:$("err"), errmsg:$("errmsg"),
-  prevBtn:$("prevBtn"), nextBtn:$("nextBtn"), caseCount:$("caseCount"), chips:$("chips"),
+  prevBtn:$("prevBtn"), nextBtn:$("nextBtn"), caseCount:$("caseCount"), crumb:$("crumb"), navgroups:$("navgroups"),
   content:$("content"), dims:$("dims"), comment:$("comment"),
   doneFlag:$("doneFlag"),
 };
@@ -387,25 +412,103 @@ function renderPanel(){
     btn.addEventListener("click",()=>{
       const dim=btn.dataset.dim, val=+btn.dataset.val;
       evals[idx]=Object.assign({}, evals[idx], {[dim]:val});
-      renderPanel(); renderChips(); updateProgress(); saveState();
+      renderPanel(); renderNav(); updateProgress(); saveState();
     });
   });
   els.comment.value = e.comment || "";
   els.doneFlag.innerHTML = fullyScored(e) ? '<span class="done-flag">'+CHECKCIRC+' Done</span>' : "";
 }
 
-// ── Render case strip ──
-function renderChips(){
+// ── Case grouping ──
+function featureMissing(c){
+  const f = c && c.features;
+  if(!f || typeof f!=="object" || Array.isArray(f)) return true; // no usable features = treat as missing
+  return Object.values(f).some(v => v===null || v===undefined || v==="" || (typeof v==="number" && Number.isNaN(v)));
+}
+function labelOf(c){ return (c && c.label!=null && c.label!=="") ? String(c.label) : "(no label)"; }
+function groupKeyOf(c){ return featureMissing(c) ? "missing" : "complete"; }
+
+function computeGroups(){
+  const groups = MISSING_GROUPS.map(mg=>({key:mg.key, name:mg.name, subs:[], idxs:[], done:0, total:0}));
+  const byKey = {}; groups.forEach(g=>byKey[g.key]=g);
+  const tmp = {}; groups.forEach(g=>tmp[g.key]={});
+  cases.forEach((c,i)=>{
+    const gk = groupKeyOf(c), lab = labelOf(c);
+    (tmp[gk][lab] = tmp[gk][lab] || []).push(i);
+  });
+  groups.forEach(g=>{
+    const present = Object.keys(tmp[g.key]);
+    const ordered = LABEL_ORDER.filter(l=>present.includes(l))
+      .concat(present.filter(l=>!LABEL_ORDER.includes(l)).sort());
+    ordered.forEach(lab=>{
+      const idxs = tmp[g.key][lab];
+      g.subs.push({ label:lab, idxs });
+      g.idxs.push(...idxs);
+      g.total += idxs.length;
+      g.done  += idxs.filter(i=>fullyScored(evals[i])).length;
+    });
+  });
+  const order = [];
+  groups.forEach(g=>g.subs.forEach(s=>order.push(...s.idxs)));
+  return { groups, order };
+}
+function crumbFor(i){
+  const c = cases[i];
+  const gName = featureMissing(c) ? "Has missing values" : "No missing values";
+  return gName + "  \u00b7  " + labelOf(c);
+}
+
+// ── Render grouped navigator ──
+function renderNav(){
+  const { groups } = computeGroups();
   els.caseCount.textContent = "Case "+(idx+1)+" / "+cases.length;
-  els.chips.innerHTML = cases.map((_,i)=>{
-    const done = fullyScored(evals[i]);
-    const cls = "chip"+(i===idx?" active":"")+(done?" done":"");
-    const inner = (done && i!==idx) ? CHECK : (i+1);
-    return '<button class="'+cls+'" data-i="'+i+'">'+inner+'</button>';
-  }).join("");
-  els.chips.querySelectorAll(".chip").forEach(c=>c.addEventListener("click",()=>goTo(+c.dataset.i)));
-  els.prevBtn.disabled = idx===0;
-  els.nextBtn.disabled = idx===cases.length-1;
+  els.crumb.textContent = crumbFor(idx);
+
+  let html = "";
+  groups.forEach(g=>{
+    if(!g.total) return;
+    const collapsed = !!collapsedGroups[g.key];
+    html += '<div class="navgroup">';
+    html += '<button class="navg-head" data-grp="'+g.key+'">'+
+              '<span class="navg-caret'+(collapsed?" col":"")+'">\u25be</span>'+
+              '<span class="navg-name">'+esc(g.name)+'</span>'+
+              '<span class="navg-count">'+g.done+'/'+g.total+'</span>'+
+            '</button>';
+    if(!collapsed){
+      g.subs.forEach(sub=>{
+        if(!sub.idxs.length) return;
+        html += '<div class="navsub">'+
+                  '<div class="navsub-name">'+esc(sub.label)+'<span class="navsub-count">'+sub.idxs.length+'</span></div>'+
+                  '<div class="chips">'+
+                    sub.idxs.map(i=>{
+                      const done = fullyScored(evals[i]);
+                      const cls = "chip"+(i===idx?" active":"")+(done?" done":"");
+                      const inner = (done && i!==idx) ? CHECK : (i+1);
+                      return '<button class="'+cls+'" data-i="'+i+'">'+inner+'</button>';
+                    }).join("")+
+                  '</div>'+
+                '</div>';
+      });
+    }
+    html += '</div>';
+  });
+  els.navgroups.innerHTML = html;
+
+  els.navgroups.querySelectorAll(".chip").forEach(c=>c.addEventListener("click",()=>goTo(+c.dataset.i)));
+  els.navgroups.querySelectorAll(".navg-head").forEach(h=>h.addEventListener("click",()=>{
+    collapsedGroups[h.dataset.grp] = !collapsedGroups[h.dataset.grp];
+    renderNav();
+  }));
+
+  const pos = orderSeq.indexOf(idx);
+  els.prevBtn.disabled = pos<=0;
+  els.nextBtn.disabled = pos<0 || pos>=orderSeq.length-1;
+}
+function stepNav(delta){
+  const pos = orderSeq.indexOf(idx);
+  if(pos<0) return;
+  const np = pos + delta;
+  if(np>=0 && np<orderSeq.length) goTo(orderSeq[np]);
 }
 
 function caseHasData(i){
@@ -427,7 +530,7 @@ function updateProgress(){
 
 function goTo(i){
   idx = Math.max(0, Math.min(cases.length-1, i));
-  renderContent(); renderPanel(); renderChips(); updateProgress(); saveState();
+  renderContent(); renderPanel(); renderNav(); updateProgress(); saveState();
 }
 
 // ── Apply data ──
@@ -438,10 +541,13 @@ function applyCases(list, fname, restored){
   displayFields = def.length?def:keys;   // fall back to all fields if none match, to avoid a blank page
   if(restored && restored.evals){ evals = restored.evals; idx = restored.idx||0; }
   else { evals = {}; idx = 0; }
+  orderSeq = computeGroups().order;       // grouped display order (static for this dataset)
+  collapsedGroups = {};                   // all groups expanded by default
+  if(orderSeq.indexOf(idx)<0 && orderSeq.length) idx = orderSeq[0];
   els.emptyState.classList.add("hidden");
   els.loaded.classList.remove("hidden");
   els.topctrl.classList.remove("hidden");
-  renderContent(); renderPanel(); renderChips(); updateProgress(); saveState();
+  renderContent(); renderPanel(); renderNav(); updateProgress(); saveState();
 }
 
 function showErr(m){ els.errmsg.textContent=m; els.err.classList.remove("hidden"); }
@@ -474,14 +580,14 @@ function exportJSON(){
 }
 
 // ── Event bindings ──
-els.prevBtn.addEventListener("click",()=>goTo(idx-1));
-els.nextBtn.addEventListener("click",()=>goTo(idx+1));
+els.prevBtn.addEventListener("click",()=>stepNav(-1));
+els.nextBtn.addEventListener("click",()=>stepNav(1));
 els.btnExport.addEventListener("click",exportJSON);
 els.btnClearOne.addEventListener("click",()=>{
   if(!caseHasData(idx)) return;
   if(!window.confirm("Clear the score and comment for this case (Case "+(idx+1)+")?\n\nThis cannot be undone.")) return;
   delete evals[idx];
-  renderPanel(); renderChips(); updateProgress(); saveState();
+  renderPanel(); renderNav(); updateProgress(); saveState();
 });
 els.btnClearAll.addEventListener("click",()=>{
   if(!anyData()) return;
@@ -489,7 +595,7 @@ els.btnClearAll.addEventListener("click",()=>{
   if(!window.confirm("Clear ALL scores and comments? This cannot be undone.\n\n("+n+" case"+(n===1?"":"s")+" will be reset.)")) return;
   evals = {};
   idx = 0;
-  renderContent(); renderPanel(); renderChips(); updateProgress(); saveState();
+  renderContent(); renderPanel(); renderNav(); updateProgress(); saveState();
 });
 els.comment.addEventListener("input",()=>{ evals[idx]=Object.assign({}, evals[idx], {comment:els.comment.value}); saveState(); });
 els.evaluator.addEventListener("input",saveState);
@@ -497,8 +603,8 @@ document.addEventListener("keydown",e=>{
   if(!cases) return;
   const tag=document.activeElement&&document.activeElement.tagName;
   if(tag==="TEXTAREA"||tag==="INPUT") return;
-  if(e.key==="ArrowLeft") goTo(idx-1);
-  if(e.key==="ArrowRight") goTo(idx+1);
+  if(e.key==="ArrowLeft") stepNav(-1);
+  if(e.key==="ArrowRight") stepNav(1);
 });
 
 // ── Manual file selection (fallback) ──
