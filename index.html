@@ -93,11 +93,19 @@ header{
 .navsub{margin:2px 0 8px 18px;}
 .navsub-name{font-size:11px;color:var(--ink2);font-weight:500;margin:6px 0 5px;display:flex;align-items:center;gap:6px;}
 .navsub-count{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink3);}
+.navsub-wrong{color:var(--rose);font-weight:600;margin-left:6px;}
+.nav-legend{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--ink2);padding:2px 4px 6px;}
+.leg-swatch{width:14px;height:14px;border-radius:4px;background:#f6e3e1;border:1px solid #dca39d;display:inline-block;}
 .chips{display:flex;flex-wrap:wrap;gap:6px;padding:1px;}
 .chip{flex:0 0 auto;min-width:30px;height:30px;padding:0 7px;border-radius:7px;border:1px solid var(--line2);background:var(--card);color:var(--ink2);font-size:12px;font-family:'IBM Plex Mono',monospace;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:3px;transition:all .12s ease;}
 .chip:hover{border-color:var(--teal);color:var(--ink);}
 .chip.done{background:var(--teal-soft);border-color:var(--teal);color:var(--teal-d);}
 .chip.active{background:var(--teal);border-color:var(--teal);color:#fbf9f4;box-shadow:0 2px 0 var(--teal-d);}
+/* misclassified cases: rose palette, overrides the teal variants above */
+.chip.wrong{background:#f6e3e1;border-color:#dca39d;color:var(--rose);}
+.chip.wrong:hover{border-color:var(--rose);color:var(--rose);}
+.chip.wrong.done{background:#f1cfca;border-color:var(--rose);color:#7c2a2a;}
+.chip.wrong.active{background:var(--rose);border-color:var(--rose);color:#fff;box-shadow:0 2px 0 #6f2020;}
 .chip svg{width:12px;height:12px;}
 
 /* ── Two-column layout ── */
@@ -175,19 +183,20 @@ header{
 <!-- Fallback UI when auto-load fails -->
 <div id="emptyState" class="empty-state hidden">
   <h2 class="serif">Could not load data automatically</h2>
-  <p class="lead" id="emptyMsg">The page failed to load <span class="mono" id="dataUrlLabel">data.json</span> automatically.<br>This usually happens when the file is opened by double-clicking &mdash; browsers block local pages from reading local files.</p>
+  <p class="lead" id="emptyMsg">The page failed to load the data files (<span class="mono" id="dataUrlLabel">data_complete.json, data_unknown.json</span>) automatically.<br>This usually happens when the file is opened by double-clicking &mdash; browsers block local pages from reading local files.</p>
   <div class="fmt" style="text-align:left;white-space:pre-wrap;">How to fix (either option):
-1) Host this file and data.json on a server / intranet / static hosting;
+1) Host this file and the two data files on a server / intranet / static hosting;
 2) In the data folder, run:  python -m http.server
    then open http://localhost:8000 in a browser
 
-Or select the file manually below ↓</div>
+Or select the data file(s) manually below &darr;
+(You can select both at once; the group is taken from each file name.)</div>
   <div class="drop" id="drop" style="margin-top:16px;">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-    <h3>Click to select data.json</h3>
+    <h3>Click to select data file(s)</h3>
     <p>Supports .json &mdash; a top-level array, or an object containing an array</p>
   </div>
-  <input id="fileInput" type="file" accept=".json,application/json" hidden />
+  <input id="fileInput" type="file" accept=".json,application/json" multiple hidden />
 </div>
 
 <!-- Loaded view -->
@@ -221,15 +230,18 @@ Or select the file manually below ↓</div>
 
 /* ============================================================
    ▼▼▼  DATA SOURCE SETTING  ▼▼▼
-   On load, the page automatically fetches JSON from DATA_URL.
-   - Same-directory file:  "./data.json"
-   - Subdirectory:         "./data/cases.json"
-   - Full URL:             "https://your-domain/path/data.json"
-   Note: the page must be served over http(s) (a server or
-   python -m http.server). A file:// page opened by double-click
-   cannot auto-load and will fall back to manual selection.
+   On load, the page fetches the two files below. Each file's
+   cases are tagged with that source's group (it is NOT inferred
+   from the data). If a file is missing or fails to load, the
+   page just shows whichever file(s) did load.
+   Files must be served over http(s) (a server or
+   python -m http.server); a file:// page opened by double-click
+   cannot auto-load and falls back to manual selection.
    ============================================================ */
-const DATA_URL = "./data.json";
+const DATA_SOURCES = [
+  { url: "./data_complete.json", groupKey: "complete", groupName: "No missing values" },
+  { url: "./data_unknown.json",  groupKey: "missing",  groupName: "Has missing values" },
+];
 /* ▲▲▲  END OF SETTING  ▲▲▲ */
 
 // ── Config ──
@@ -266,15 +278,13 @@ const FEATURE_LABELS = {
 };
 
 // Two-level case grouping for the navigator.
-// Level 1: whether the features object contains any missing (null) value.
+// Level 1: the source file each case came from (tagged at load via _group).
 // Level 2: the case label. Edit/reorder LABEL_ORDER as needed; any label not
 // listed here is shown after these, under its own section.
 const LABEL_ORDER = ["Normal Cognition", "Mild Cognitive Impairment", "Alzheimer's Disease"];
-const MISSING_GROUPS = [
-  { key: "complete", name: "No missing values" },
-  { key: "missing",  name: "Has missing values" },
-];
-const LS_KEY = "reasoning_eval_state_v3_multi";
+const MISSING_GROUPS = DATA_SOURCES.map(s=>({ key: s.groupKey, name: s.groupName }));
+const GROUP_NAME = {}; MISSING_GROUPS.forEach(g=>{ GROUP_NAME[g.key]=g.name; });
+const LS_KEY = "reasoning_eval_state_v4_sourcegroups";
 
 // ── State ──
 let cases = null, fileName = "", idx = 0;
@@ -419,13 +429,18 @@ function renderPanel(){
 }
 
 // ── Case grouping ──
-function featureMissing(c){
-  const f = c && c.features;
-  if(!f || typeof f!=="object" || Array.isArray(f)) return true; // no usable features = treat as missing
-  return Object.values(f).some(v => v===null || v===undefined || v==="" || (typeof v==="number" && Number.isNaN(v)));
-}
 function labelOf(c){ return (c && c.label!=null && c.label!=="") ? String(c.label) : "(no label)"; }
-function groupKeyOf(c){ return featureMissing(c) ? "missing" : "complete"; }
+function isCorrect(c){
+  const v = c && c._is_correct;
+  if(v===true || v===1 || v==="1") return true;
+  if(typeof v==="string"){ const s=v.toLowerCase(); return s==="true"||s==="correct"||s==="yes"; }
+  return false;   // false / 0 / missing / anything else = incorrect
+}
+function groupKeyOf(c){
+  // group is the source file each case came from, tagged at load time
+  const gk = c && c._group;
+  return GROUP_NAME[gk]!=null ? gk : (MISSING_GROUPS[0] ? MISSING_GROUPS[0].key : "complete");
+}
 
 function computeGroups(){
   const groups = MISSING_GROUPS.map(mg=>({key:mg.key, name:mg.name, subs:[], idxs:[], done:0, total:0}));
@@ -433,6 +448,7 @@ function computeGroups(){
   const tmp = {}; groups.forEach(g=>tmp[g.key]={});
   cases.forEach((c,i)=>{
     const gk = groupKeyOf(c), lab = labelOf(c);
+    if(!tmp[gk]) return;                 // case from an unknown group: skip in nav (still in data)
     (tmp[gk][lab] = tmp[gk][lab] || []).push(i);
   });
   groups.forEach(g=>{
@@ -440,7 +456,9 @@ function computeGroups(){
     const ordered = LABEL_ORDER.filter(l=>present.includes(l))
       .concat(present.filter(l=>!LABEL_ORDER.includes(l)).sort());
     ordered.forEach(lab=>{
-      const idxs = tmp[g.key][lab];
+      // correctly classified first, misclassified pushed to the end (order preserved within each)
+      const raw = tmp[g.key][lab];
+      const idxs = raw.filter(i=>isCorrect(cases[i])).concat(raw.filter(i=>!isCorrect(cases[i])));
       g.subs.push({ label:lab, idxs });
       g.idxs.push(...idxs);
       g.total += idxs.length;
@@ -450,15 +468,14 @@ function computeGroups(){
   const order = [];
   const localId = {};
   groups.forEach(g=>g.subs.forEach(s=>{
-    s.idxs.forEach((gi,pos)=>{ localId[gi]=pos; });   // 0-based numbering, restarts per (missing × label) category
+    s.idxs.forEach((gi,pos)=>{ localId[gi]=pos; });   // 0-based numbering, restarts per (group × label) category
     order.push(...s.idxs);
   }));
   return { groups, order, localId };
 }
 function crumbFor(i){
   const c = cases[i];
-  const gName = featureMissing(c) ? "Has missing values" : "No missing values";
-  return gName + "  \u00b7  " + labelOf(c);
+  return (GROUP_NAME[groupKeyOf(c)] || "") + "  \u00b7  " + labelOf(c);
 }
 
 // ── Render grouped navigator ──
@@ -468,6 +485,9 @@ function renderNav(){
   els.crumb.textContent = crumbFor(idx);
 
   let html = "";
+  if(cases.some(c=>!isCorrect(c))){
+    html += '<div class="nav-legend"><span class="leg-swatch"></span>Misclassified cases (shown last in each section)</div>';
+  }
   groups.forEach(g=>{
     if(!g.total) return;
     const collapsed = !!collapsedGroups[g.key];
@@ -480,14 +500,17 @@ function renderNav(){
     if(!collapsed){
       g.subs.forEach(sub=>{
         if(!sub.idxs.length) return;
+        const wrongCount = sub.idxs.filter(i=>!isCorrect(cases[i])).length;
         html += '<div class="navsub">'+
-                  '<div class="navsub-name">'+esc(sub.label)+'<span class="navsub-count">'+sub.idxs.length+'</span></div>'+
+                  '<div class="navsub-name">'+esc(sub.label)+'<span class="navsub-count">'+sub.idxs.length+
+                    (wrongCount?' <span class="navsub-wrong">'+wrongCount+' misclassified</span>':'')+'</span></div>'+
                   '<div class="chips">'+
                     sub.idxs.map(i=>{
                       const done = fullyScored(evals[i]);
-                      const cls = "chip"+(i===idx?" active":"")+(done?" done":"");
+                      const wrong = !isCorrect(cases[i]);
+                      const cls = "chip"+(wrong?" wrong":"")+(i===idx?" active":"")+(done?" done":"");
                       const inner = (done && i!==idx) ? CHECK : localId[i];
-                      return '<button class="'+cls+'" data-i="'+i+'">'+inner+'</button>';
+                      return '<button class="'+cls+'" data-i="'+i+'" title="'+(wrong?'Misclassified':'Correct')+'">'+inner+'</button>';
                     }).join("")+
                   '</div>'+
                 '</div>';
@@ -561,7 +584,8 @@ function exportJSON(){
   const results = cases.map((c,i)=>{
     const e = evals[i]||{}; const scores={};
     DIMENSIONS.forEach(d=>{ scores[d.label]= e[d.key]!=null ? e[d.key] : null; });
-    return { index:i, source:c, scores, comment:e.comment||"", complete:fullyScored(e) };
+    const src = Object.assign({}, c); delete src._group;   // keep source as in the original file
+    return { index:i, group:(GROUP_NAME[groupKeyOf(c)]||null), label:labelOf(c), correct:isCorrect(c), source:src, scores, comment:e.comment||"", complete:fullyScored(e) };
   });
   const summary={};
   DIMENSIONS.forEach(d=>{
@@ -611,45 +635,69 @@ document.addEventListener("keydown",e=>{
 });
 
 // ── Manual file selection (fallback) ──
-function ingest(file){
-  if(!file) return;
-  const reader=new FileReader();
-  reader.onload=()=>{
-    try{
-      const list=normalizeCases(JSON.parse(reader.result));
-      if(!list.length) throw new Error("No items to evaluate in the file");
-      start(list);
-    }catch(err){ els.emptyMsg.textContent="Could not parse the file. Please make sure it is valid JSON: "+err.message; }
-  };
-  reader.readAsText(file);
+// Tag every case in a list with its level-1 group key
+function tagGroup(list, groupKey){
+  list.forEach(c=>{ if(c && typeof c==="object" && !Array.isArray(c)) c._group = groupKey; });
+  return list;
 }
-els.fileInput.addEventListener("change",e=>{ ingest(e.target.files[0]); e.target.value=""; });
+// Decide a file's group from its name by matching the configured sources
+function groupForFilename(name){
+  const n = (name||"").toLowerCase();
+  for(const s of DATA_SOURCES){
+    const base = s.url.split("/").pop().toLowerCase().replace(/\.json$/,"");
+    if(base && n.includes(base)) return s.groupKey;
+  }
+  if(n.includes("unknown")){
+    const m = DATA_SOURCES.find(s=>/unknown/i.test(s.url)); if(m) return m.groupKey;
+  }
+  return MISSING_GROUPS[0] ? MISSING_GROUPS[0].key : "complete";
+}
+// Manual fallback: accept one or more files, tag by name, merge
+function ingestFiles(fileList){
+  const files = [...(fileList||[])];
+  if(!files.length) return;
+  let pending = files.length;
+  const merged = [];
+  files.forEach(file=>{
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      try{
+        const list = tagGroup(normalizeCases(JSON.parse(reader.result)), groupForFilename(file.name));
+        merged.push(...list);
+      }catch(err){ els.emptyMsg.textContent = "Could not parse "+file.name+": "+err.message; }
+      if(--pending===0){ if(merged.length) start(merged); }
+    };
+    reader.onerror = ()=>{ if(--pending===0){ if(merged.length) start(merged); } };
+    reader.readAsText(file);
+  });
+}
+els.fileInput.addEventListener("change",e=>{ ingestFiles(e.target.files); e.target.value=""; });
 els.drop.addEventListener("click",()=>els.fileInput.click());
 els.drop.addEventListener("dragover",e=>{ e.preventDefault(); els.drop.classList.add("drag"); });
 els.drop.addEventListener("dragleave",()=>els.drop.classList.remove("drag"));
-els.drop.addEventListener("drop",e=>{ e.preventDefault(); els.drop.classList.remove("drag"); ingest(e.dataTransfer.files[0]); });
+els.drop.addEventListener("drop",e=>{ e.preventDefault(); els.drop.classList.remove("drag"); ingestFiles(e.dataTransfer.files); });
 
-// ── Start with a dataset (restores this browser's progress if case count matches) ──
-function start(list){
+// ── Start with a merged dataset (restores this browser's progress if case count matches) ──
+function start(merged){
   const saved = loadSavedMeta();
-  const restored = (saved && saved.total===list.length) ? saved : null;
-  applyCases(list, DATA_URL, restored);
+  const restored = (saved && saved.total===merged.length) ? saved : null;
+  applyCases(merged, "data", restored);
 }
 
-// ── Boot: auto-fetch from DATA_URL; fall back to manual selection on failure ──
+// ── Boot: fetch every source, tag by group, merge; show whatever loaded ──
 (function init(){
-  els.dataUrlLabel.textContent = DATA_URL;
-  fetch(DATA_URL, {cache:"no-store"})
-    .then(r=>{ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
-    .then(data=>{
-      const list = normalizeCases(data);
-      if(!list.length) throw new Error("Data is empty");
-      start(list);
-    })
-    .catch(err=>{
-      els.emptyState.classList.remove("hidden");
-      console.warn("Auto-load failed:", err.message);
-    });
+  if(els.dataUrlLabel) els.dataUrlLabel.textContent = DATA_SOURCES.map(s=>s.url).join(", ");
+  Promise.all(DATA_SOURCES.map(src=>
+    fetch(src.url, {cache:"no-store"})
+      .then(r=>{ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
+      .then(data=>tagGroup(normalizeCases(data), src.groupKey))
+      .catch(err=>{ console.warn("Load failed for "+src.url+":", err.message); return null; })
+  )).then(results=>{
+    const merged = [];
+    results.forEach(list=>{ if(Array.isArray(list)) merged.push(...list); });
+    if(merged.length) start(merged);
+    else els.emptyState.classList.remove("hidden");
+  });
 })();
 </script>
 </body>
