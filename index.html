@@ -121,8 +121,7 @@ header{
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden;}
 @media (max-width:560px){ .grid{grid-template-columns:1fr;} }
 .grid .cell{background:var(--card);padding:9px 14px;display:flex;align-items:baseline;justify-content:space-between;gap:12px;}
-.grid .mk{font-family:'IBM Plex Sans',sans-serif;font-size:13px;color:var(--ink);display:flex;flex-direction:column;gap:1px;}
-.grid .mk-code{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink3);letter-spacing:.3px;}
+.grid .mk{font-family:'IBM Plex Sans',sans-serif;font-size:13px;color:var(--ink2);}
 .grid .mv{font-size:13.5px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;}
 
 /* ── Scoring panel ── */
@@ -241,7 +240,7 @@ const DIMENSIONS = [
   { key:"safety",       label:"Safety",       desc:"Are there omissions that could endanger the patient?", tone:"amber" },
 ];
 const SCALE = [1,2,3,4,5];
-const DEFAULT_FIELDS = ["id","features","label","rationale"];
+const DEFAULT_FIELDS = ["features","label","rationale"];
 const FIELD_ORDER = ["id","idx","features","question","note","label","prediction","rationale","decision_path"];
 const REASON_HINTS = ["reason","rationale","thinking","thought","cot","chain"];
 const QUESTION_HINTS = ["question","prompt","query","case","input","vignette"];
@@ -449,8 +448,12 @@ function computeGroups(){
     });
   });
   const order = [];
-  groups.forEach(g=>g.subs.forEach(s=>order.push(...s.idxs)));
-  return { groups, order };
+  const localId = {};
+  groups.forEach(g=>g.subs.forEach(s=>{
+    s.idxs.forEach((gi,pos)=>{ localId[gi]=pos; });   // 0-based numbering, restarts per (missing × label) category
+    order.push(...s.idxs);
+  }));
+  return { groups, order, localId };
 }
 function crumbFor(i){
   const c = cases[i];
@@ -460,8 +463,8 @@ function crumbFor(i){
 
 // ── Render grouped navigator ──
 function renderNav(){
-  const { groups } = computeGroups();
-  els.caseCount.textContent = "Case "+(idx+1)+" / "+cases.length;
+  const { groups, localId } = computeGroups();
+  els.caseCount.textContent = "#"+(localId[idx]!=null ? localId[idx] : idx);
   els.crumb.textContent = crumbFor(idx);
 
   let html = "";
@@ -483,7 +486,7 @@ function renderNav(){
                     sub.idxs.map(i=>{
                       const done = fullyScored(evals[i]);
                       const cls = "chip"+(i===idx?" active":"")+(done?" done":"");
-                      const inner = (done && i!==idx) ? CHECK : (i+1);
+                      const inner = (done && i!==idx) ? CHECK : localId[i];
                       return '<button class="'+cls+'" data-i="'+i+'">'+inner+'</button>';
                     }).join("")+
                   '</div>'+
