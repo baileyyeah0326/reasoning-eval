@@ -356,7 +356,7 @@ function renderValue(value){
     const entries = Object.entries(value);
     if(entries.every(([,vv])=>vv===null||typeof vv!=="object")){
       return '<div class="grid">'+entries.map(([mk,mv])=>
-        '<div class="cell"><span class="mk">'+(FEATURE_LABELS[mk]?esc(FEATURE_LABELS[mk])+'<span class="mk-code">'+esc(mk)+'</span>':esc(mk))+'</span><span class="mv">'+(mv===null?"—":esc(mv))+'</span></div>'
+        '<div class="cell"><span class="mk">'+esc(FEATURE_LABELS[mk]||mk)+'</span><span class="mv">'+(mv===null?"—":esc(mv))+'</span></div>'
       ).join("")+'</div>';
     }
   }
