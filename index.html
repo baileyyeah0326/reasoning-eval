@@ -825,7 +825,6 @@ async function doLogin(){
   const name = (els.loginName.value||"").trim();
   if(name.length<1){ els.loginMsg.textContent = "Please enter your name to continue."; return; }
   evaluatorName = name;
-  try{ localStorage.setItem("reasoning_eval_name", name); }catch(e){}
   els.whoami.textContent = name;
   els.login.classList.add("hidden");
   const merged = await dataReady;
@@ -833,13 +832,14 @@ async function doLogin(){
   else { els.emptyState.classList.remove("hidden"); }
 }
 function initLogin(){
-  try{ const last=localStorage.getItem("reasoning_eval_name"); if(last) els.loginName.value=last; }catch(e){}
+  els.loginName.value = "";   // never prefill — multiple evaluators may share a device
   els.loginBtn.addEventListener("click",doLogin);
   els.loginName.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); doLogin(); }});
   setTimeout(()=>els.loginName.focus(), 50);
 }
 els.btnSignout.addEventListener("click",()=>{
   evaluatorName = ""; evals = {}; savedSnapshot = {};
+  els.loginName.value = ""; els.loginMsg.textContent = "";
   els.loaded.classList.add("hidden"); els.topctrl.classList.add("hidden"); els.emptyState.classList.add("hidden");
   els.login.classList.remove("hidden");
   setTimeout(()=>els.loginName.focus(), 50);
