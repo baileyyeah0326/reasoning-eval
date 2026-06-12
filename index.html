@@ -74,10 +74,8 @@ header{
 .err{margin:14px 22px;padding:11px 14px;border-radius:10px;background:#f6e3e1;border:1px solid #e3b8b3;color:var(--rose);font-size:13px;display:flex;gap:8px;align-items:flex-start;}
 .err svg{width:16px;height:16px;flex:0 0 auto;margin-top:1px;}
 
-/* ── Case navigation ── */
-.navbar{position:sticky;top:67px;z-index:16;}
-.strip{display:flex;align-items:center;gap:8px;padding:11px 22px;background:var(--card);border-bottom:1px solid var(--line);}
-.nav-toggle{flex:0 0 auto;white-space:nowrap;}
+/* ── Case navigation (top strip + left sidebar) ── */
+.strip{display:flex;align-items:center;gap:8px;padding:10px 22px;background:var(--card);border-bottom:1px solid var(--line);flex:0 0 auto;}
 .nav{display:flex;gap:6px;flex:0 0 auto;}
 .nav button{width:34px;height:34px;border-radius:8px;border:1px solid var(--line2);background:var(--paper);color:var(--ink);cursor:pointer;display:grid;place-items:center;}
 .nav button:hover:not(:disabled){background:var(--paper2);}
@@ -85,23 +83,34 @@ header{
 .nav svg{width:18px;height:18px;}
 .count{font-size:13px;color:var(--ink2);font-variant-numeric:tabular-nums;white-space:nowrap;padding:0 4px;font-weight:600;}
 .crumb{flex:1 1 auto;font-size:12px;color:var(--ink3);font-family:'IBM Plex Mono',monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.navgroups.drawer{position:absolute;left:0;right:0;top:100%;background:var(--card);border-bottom:1px solid var(--line);box-shadow:0 14px 28px rgba(0,0,0,.10);padding:8px 16px 14px;max-height:62vh;overflow-y:auto;display:none;}
-.navgroups.drawer.open{display:block;}
+
+.sidebar{flex:0 0 290px;width:290px;border-right:1px solid var(--line2);background:var(--paper);overflow-y:auto;transition:flex-basis .18s ease, width .18s ease;}
+.sidebar.collapsed{flex-basis:48px;width:48px;overflow:hidden;}
+.side-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--paper);z-index:2;}
+.side-title{font-family:'Fraunces',serif;font-size:15px;font-weight:600;}
+.sidebar.collapsed .side-title{display:none;}
+.sidebar.collapsed .side-head{justify-content:center;padding:10px 6px;}
+.side-collapse{width:30px;height:30px;flex:0 0 auto;border:1px solid var(--line2);background:var(--card);border-radius:7px;cursor:pointer;display:grid;place-items:center;color:var(--ink2);}
+.side-collapse:hover{background:var(--paper2);color:var(--ink);}
+.side-collapse svg{width:16px;height:16px;transition:transform .18s ease;}
+.sidebar.collapsed .side-collapse svg{transform:rotate(180deg);}
+.navgroups{padding:8px 12px 16px;}
+.sidebar.collapsed .navgroups{display:none;}
 .navgroup{margin-top:6px;}
 .navg-head{display:flex;align-items:center;gap:8px;width:100%;text-align:left;cursor:pointer;background:none;border:none;padding:6px 4px;color:var(--ink);}
 .navg-head:hover{color:var(--teal-d);}
 .navg-caret{font-size:11px;color:var(--ink3);transition:transform .15s ease;display:inline-block;}
 .navg-caret.col{transform:rotate(-90deg);}
 .navg-name{font-size:13px;font-weight:600;letter-spacing:.2px;}
-.navg-count{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink3);background:var(--paper2);border:1px solid var(--line);border-radius:99px;padding:1px 8px;}
-.navsub{margin:2px 0 8px 18px;}
+.navg-count{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink3);background:var(--paper2);border:1px solid var(--line);border-radius:99px;padding:1px 8px;margin-left:auto;}
+.navsub{margin:2px 0 8px 16px;}
 .navsub-name{font-size:11px;color:var(--ink2);font-weight:500;margin:6px 0 5px;display:flex;align-items:center;gap:6px;}
 .navsub-count{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink3);}
 .navsub-wrong{color:var(--rose);font-weight:600;margin-left:6px;}
-.nav-legend{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--ink2);padding:2px 4px 6px;}
+.nav-legend{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--ink2);padding:2px 4px 8px;}
 .leg-swatch{width:14px;height:14px;border-radius:4px;background:#f6e3e1;border:1px solid #dca39d;display:inline-block;}
 .chips{display:flex;flex-wrap:wrap;gap:6px;padding:1px;}
-.chip{flex:0 0 auto;min-width:30px;height:30px;padding:0 7px;border-radius:7px;border:1px solid var(--line2);background:var(--card);color:var(--ink2);font-size:12px;font-family:'IBM Plex Mono',monospace;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:3px;transition:all .12s ease;}
+.chip{position:relative;flex:0 0 auto;min-width:30px;height:30px;padding:0 7px;border-radius:7px;border:1px solid var(--line2);background:var(--card);color:var(--ink2);font-size:12px;font-family:'IBM Plex Mono',monospace;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:3px;transition:all .12s ease;}
 .chip:hover{border-color:var(--teal);color:var(--ink);}
 .chip.done{background:var(--teal-soft);border-color:var(--teal);color:var(--teal-d);}
 .chip.active{background:var(--teal);border-color:var(--teal);color:#fbf9f4;box-shadow:0 2px 0 var(--teal-d);}
@@ -112,10 +121,12 @@ header{
 .chip.wrong.active{background:var(--rose);border-color:var(--rose);color:#fff;box-shadow:0 2px 0 #6f2020;}
 .chip svg{width:12px;height:12px;}
 
-/* ── Two-column layout ── */
-.main{display:grid;grid-template-columns:1fr 372px;flex:1 1 auto;min-height:0;}
-@media (max-width:880px){ .main{grid-template-columns:1fr;} }
-.content{padding:26px 28px 60px;overflow-y:auto;}
+/* ── Three-column layout ── */
+.cols{display:flex;flex:1 1 auto;min-height:0;}
+@media (max-width:900px){
+  .sidebar{flex-basis:220px;width:220px;}
+}
+.content{flex:1 1 auto;min-width:0;padding:26px 28px 60px;overflow-y:auto;}
 .field{margin-bottom:22px;animation:up .4s ease both;}
 @keyframes up{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
 .fkey{display:inline-flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--ink3);margin-bottom:7px;}
@@ -133,12 +144,12 @@ header{
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden;}
 @media (max-width:560px){ .grid{grid-template-columns:1fr;} }
 .grid .cell{background:var(--card);padding:9px 14px;display:flex;align-items:baseline;justify-content:space-between;gap:12px;}
-.grid .mk{font-family:'IBM Plex Sans',sans-serif;font-size:13px;color:var(--ink2);}
-.grid .mv{font-size:13.5px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.grid .mk{font-family:'IBM Plex Sans','Heiti SC','SimHei','Microsoft YaHei',sans-serif;font-size:13px;font-weight:600;color:var(--ink);}
+.grid .mv{font-family:'IBM Plex Sans','Heiti SC','SimHei','Microsoft YaHei',sans-serif;font-size:13.5px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--ink);}
 
 /* ── Scoring panel ── */
-.panel{background:var(--card);border-left:1px solid var(--line2);padding:22px 22px 40px;overflow-y:auto;}
-@media (max-width:880px){ .panel{border-left:none;border-top:1px solid var(--line2);} }
+.panel{flex:0 0 360px;background:var(--card);border-left:1px solid var(--line2);padding:22px 22px 40px;overflow-y:auto;}
+@media (max-width:900px){ .panel{flex-basis:320px;} }
 .panel-htop{display:flex;justify-content:space-between;align-items:center;}
 .panel-h{font-family:'Fraunces',serif;font-size:17px;font-weight:600;}
 .panel-sub{font-size:12px;color:var(--ink2);margin:4px 0 20px;}
@@ -248,19 +259,22 @@ Or select the data file(s) manually below &darr;
 
 <!-- Loaded view -->
 <div id="loaded" class="hidden" style="display:flex;flex-direction:column;flex:1 1 auto;min-height:0;">
-  <div class="navbar" id="navbar">
-    <div class="strip">
-      <div class="nav">
-        <button id="prevBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
-        <button id="nextBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>
-      </div>
-      <span class="count" id="caseCount"></span>
-      <span class="crumb" id="crumb"></span>
-      <button class="btn btn-ghost nav-toggle" id="navToggle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>Browse cases</button>
+  <div class="strip">
+    <div class="nav">
+      <button id="prevBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <button id="nextBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>
     </div>
-    <div class="navgroups drawer" id="navgroups"></div>
+    <span class="count" id="caseCount"></span>
+    <span class="crumb" id="crumb"></span>
   </div>
-  <div class="main">
+  <div class="cols">
+    <aside class="sidebar" id="sidebar">
+      <div class="side-head">
+        <span class="side-title">Cases</span>
+        <button class="side-collapse" id="sideCollapse" title="Collapse / expand"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></svg></button>
+      </div>
+      <div class="navgroups" id="navgroups"></div>
+    </aside>
     <section class="content" id="content"></section>
     <aside class="panel">
       <div class="panel-htop"><div class="panel-h">Score</div><span id="doneFlag"></span></div>
@@ -371,7 +385,7 @@ const els = {
   topctrl:$("topctrl"), whoami:$("whoami"), btnSignout:$("btnSignout"), progbar:$("progbar"), pcount:$("pcount"),
   btnClearOne:$("btnClearOne"), btnClearAll:$("btnClearAll"), err:$("err"), errmsg:$("errmsg"),
   prevBtn:$("prevBtn"), nextBtn:$("nextBtn"), caseCount:$("caseCount"), crumb:$("crumb"), navgroups:$("navgroups"),
-  navbar:$("navbar"), navToggle:$("navToggle"),
+  sidebar:$("sidebar"), sideCollapse:$("sideCollapse"),
   content:$("content"), dims:$("dims"), comment:$("comment"),
   doneFlag:$("doneFlag"), btnSubmit:$("btnSubmit"), submitMsg:$("submitMsg"),
   login:$("login"), loginName:$("loginName"), loginBtn:$("loginBtn"), loginMsg:$("loginMsg"),
@@ -680,11 +694,15 @@ function renderNav(){
   });
   els.navgroups.innerHTML = html;
 
-  els.navgroups.querySelectorAll(".chip").forEach(c=>c.addEventListener("click",()=>{ goTo(+c.dataset.i); closeDrawer(); }));
+  els.navgroups.querySelectorAll(".chip").forEach(c=>c.addEventListener("click",()=>goTo(+c.dataset.i)));
   els.navgroups.querySelectorAll(".navg-head").forEach(h=>h.addEventListener("click",()=>{
     collapsedGroups[h.dataset.grp] = !collapsedGroups[h.dataset.grp];
     renderNav();
   }));
+
+  // keep the current case visible in the sidebar
+  const activeChip = els.navgroups.querySelector(".chip.active");
+  if(activeChip && activeChip.scrollIntoView) activeChip.scrollIntoView({block:"nearest"});
 
   const pos = orderSeq.indexOf(idx);
   els.prevBtn.disabled = pos<=0;
@@ -696,9 +714,7 @@ function stepNav(delta){
   const np = pos + delta;
   if(np>=0 && np<orderSeq.length) goTo(orderSeq[np]);
 }
-function openDrawer(){ els.navgroups.classList.add("open"); }
-function closeDrawer(){ els.navgroups.classList.remove("open"); }
-function toggleDrawer(){ els.navgroups.classList.toggle("open"); }
+function toggleSidebar(){ els.sidebar.classList.toggle("collapsed"); }
 
 function caseHasData(i){
   const e = evals[i];
@@ -742,10 +758,7 @@ function hideErr(){ els.err.classList.add("hidden"); }
 // ── Event bindings ──
 els.prevBtn.addEventListener("click",()=>stepNav(-1));
 els.nextBtn.addEventListener("click",()=>stepNav(1));
-els.navToggle.addEventListener("click",e=>{ e.stopPropagation(); toggleDrawer(); });
-document.addEventListener("click",e=>{
-  if(els.navgroups.classList.contains("open") && !els.navbar.contains(e.target)) closeDrawer();
-});
+els.sideCollapse.addEventListener("click",toggleSidebar);
 els.btnClearOne.addEventListener("click",()=>{
   if(!caseHasData(idx)) return;
   if(!window.confirm("Clear the score and comment for this case (Case "+(idx+1)+")?\n\nThis cannot be undone.")) return;
