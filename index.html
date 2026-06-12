@@ -166,6 +166,11 @@ header{
 .dot.sel{color:#fbf9f4;font-weight:600;border-color:transparent;transform:translateY(-1px);}
 .dim.teal .dot.sel{background:var(--teal);box-shadow:0 2px 0 var(--teal-d);}
 .dim.amber .dot.sel{background:var(--amber);box-shadow:0 2px 0 #7d4a0e;}
+.binary{display:flex;gap:8px;}
+.bin-btn{flex:1;height:40px;border-radius:9px;border:1px solid var(--line2);background:var(--paper);font-family:inherit;font-size:13.5px;font-weight:600;color:var(--ink2);cursor:pointer;transition:all .12s ease;}
+.bin-btn:hover{border-color:var(--teal);}
+.bin-none.sel{background:var(--teal);color:#fbf9f4;border-color:transparent;box-shadow:0 2px 0 var(--teal-d);}
+.bin-present.sel{background:var(--amber);color:#fbf9f4;border-color:transparent;box-shadow:0 2px 0 #7d4a0e;}
 .anchors{display:flex;justify-content:space-between;font-size:10.5px;color:var(--ink3);margin-top:5px;}
 .comment{width:100%;min-height:84px;resize:vertical;font-family:inherit;font-size:13.5px;line-height:1.6;padding:11px 12px;border:1px solid var(--line2);border-radius:10px;background:var(--paper);color:var(--ink);outline:none;}
 .comment:focus{border-color:var(--teal);}
@@ -279,7 +284,7 @@ Or select the data file(s) manually below &darr;
     <section class="content" id="content"></section>
     <aside class="panel">
       <div class="panel-htop"><div class="panel-h">Score</div><span id="doneFlag"></span></div>
-      <div class="panel-sub">1 = Poor &middot; 5 = Excellent</div>
+      <div class="panel-sub">Hallucinations: None / Present &middot; Scales: 1 = Poor, 5 = Excellent</div>
       <div id="dims"></div>
       <div class="dim">
         <div class="dim-top"><span class="dim-name">Comments</span><span class="dim-en">Optional</span></div>
@@ -315,15 +320,17 @@ const DATA_SOURCES = [
    Find them in Supabase: Project Settings → API.
    Leave them empty to run offline (Submit will be disabled).
    ============================================================ */
-const SUPABASE_URL      = "https://nndkbviqczxqxqgncggd.supabase.co";   // e.g. "https://abcdefgh.supabase.co"
-const SUPABASE_ANON_KEY = "sb_publishable_cm4fMIaM-TfjTclOJIbMGw_SPzSKVeZ";   // the long "anon public" key
+const SUPABASE_URL      = "";   // e.g. "https://abcdefgh.supabase.co"
+const SUPABASE_ANON_KEY = "";   // the long "anon public" key
 const SUPABASE_TABLE    = "evaluations";
 /* ▲▲▲  END OF SETTING  ▲▲▲ */
 const DIMENSIONS = [
-  { key:"accuracy",     label:"Accuracy",     desc:"Are the medical facts and judgments in the reasoning correct?", tone:"teal" },
-  { key:"logic",        label:"Logic",        desc:"Are the reasoning steps coherent and causally sound?", tone:"teal" },
-  { key:"completeness", label:"Completeness", desc:"Does it cover the key differential diagnoses and considerations?", tone:"teal" },
-  { key:"safety",       label:"Safety",       desc:"Are there omissions that could endanger the patient?", tone:"amber" },
+  { key:"feature_existence_hallucination", label:"Feature Existence Hallucination", desc:"Does the reasoning cite features not present in the data?", type:"binary" },
+  { key:"feature_value_hallucination",     label:"Feature Value Hallucination",     desc:"Does it misstate a feature's value?", type:"binary" },
+  { key:"comparison_hallucination",        label:"Comparison Hallucination",        desc:"Are comparisons between values or thresholds fabricated or wrong?", type:"binary" },
+  { key:"logic",                    label:"Logic",                    desc:"Are the reasoning steps coherent and causally sound?", type:"scale", tone:"teal" },
+  { key:"explanation_sufficiency",  label:"Explanation Sufficiency",  desc:"Is the explanation complete enough to justify the conclusion?", type:"scale", tone:"teal" },
+  { key:"explanation_necessity",    label:"Explanation Necessity",    desc:"Is everything in the explanation necessary (no irrelevant padding)?", type:"scale", tone:"teal" },
 ];
 const SCALE = [1,2,3,4,5];
 const DEFAULT_FIELDS = ["features","label","rationale"];
@@ -362,7 +369,7 @@ const LS_KEY = "reasoning_eval_state_v4_sourcegroups";
 
 // ── State ──
 let cases = null, fileName = "", idx = 0;
-let evals = {};            // { i: {accuracy,logic,completeness,safety,comment} }
+let evals = {};            // { i: {feature_existence_hallucination, feature_value_hallucination, comparison_hallucination, logic, explanation_sufficiency, explanation_necessity, comment} }
 let savedSnapshot = {};    // { i: canonical string of what is currently saved in the DB }
 let evaluatorName = "";    // logged-in evaluator
 let displayFields = [];   // fixed display fields (filtered by what exists in the data)
@@ -503,8 +510,18 @@ function renderContent(){
 function renderPanel(){
   const e = evals[idx] || {};
   els.dims.innerHTML = DIMENSIONS.map(d=>{
+    let control;
+    if(d.type==="binary"){
+      // false = None (no hallucination, good); true = Present (hallucination, bad)
+      const none = '<button class="bin-btn bin-none'+(e[d.key]===false?" sel":"")+'" data-dim="'+d.key+'" data-bin="0">None</button>';
+      const pres = '<button class="bin-btn bin-present'+(e[d.key]===true?" sel":"")+'" data-dim="'+d.key+'" data-bin="1">Present</button>';
+      control = '<div class="binary">'+none+pres+'</div>';
+      return '<div class="dim binary-dim">'+
+        '<div class="dim-top"><span class="dim-name">'+d.label+'</span></div>'+
+        '<div class="dim-desc">'+d.desc+'</div>'+ control + '</div>';
+    }
     const dots = SCALE.map(n=>'<button class="dot'+(e[d.key]===n?" sel":"")+'" data-dim="'+d.key+'" data-val="'+n+'">'+n+'</button>').join("");
-    return '<div class="dim '+d.tone+'">'+
+    return '<div class="dim '+(d.tone||"teal")+'">'+
       '<div class="dim-top"><span class="dim-name">'+d.label+'</span></div>'+
       '<div class="dim-desc">'+d.desc+'</div>'+
       '<div class="scale">'+dots+'</div>'+
@@ -514,6 +531,13 @@ function renderPanel(){
   els.dims.querySelectorAll(".dot").forEach(btn=>{
     btn.addEventListener("click",()=>{
       const dim=btn.dataset.dim, val=+btn.dataset.val;
+      evals[idx]=Object.assign({}, evals[idx], {[dim]:val});
+      renderPanel(); renderNav(); updateProgress(); saveState();
+    });
+  });
+  els.dims.querySelectorAll(".bin-btn").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      const dim=btn.dataset.dim, val=(btn.dataset.bin==="1");
       evals[idx]=Object.assign({}, evals[idx], {[dim]:val});
       renderPanel(); renderNav(); updateProgress(); saveState();
     });
@@ -536,7 +560,12 @@ function rowFor(i){
     group_name: GROUP_NAME[groupKeyOf(c)] || null,
     label: labelOf(c),
     is_correct: isCorrect(c),
-    accuracy: e.accuracy, logic: e.logic, completeness: e.completeness, safety: e.safety,
+    feature_existence_hallucination: e.feature_existence_hallucination,
+    feature_value_hallucination: e.feature_value_hallucination,
+    comparison_hallucination: e.comparison_hallucination,
+    logic: e.logic,
+    explanation_sufficiency: e.explanation_sufficiency,
+    explanation_necessity: e.explanation_necessity,
     comment: e.comment || "",
     cleared: false,
     updated_at: new Date().toISOString(),
@@ -584,7 +613,8 @@ async function clearInDb(indices){
       evaluator: evaluatorName, case_index: i,
       case_id: (c && (c.id!=null?String(c.id):(c.idx!=null?String(c.idx):null))),
       group_name: GROUP_NAME[groupKeyOf(c)] || null, label: labelOf(c), is_correct: isCorrect(c),
-      accuracy: null, logic: null, completeness: null, safety: null, comment: "",
+      feature_existence_hallucination: null, feature_value_hallucination: null, comparison_hallucination: null,
+      logic: null, explanation_sufficiency: null, explanation_necessity: null, comment: "",
       cleared: true, updated_at: new Date().toISOString(),
     };
   });
@@ -605,7 +635,15 @@ async function loadEvaluatorRows(){
       const i = r.case_index;
       if(i==null || i<0 || !cases || i>=cases.length) return;
       if(r.cleared) return;   // cleared rows count as un-scored
-      evals[i] = { accuracy:r.accuracy, logic:r.logic, completeness:r.completeness, safety:r.safety, comment:r.comment||"" };
+      evals[i] = {
+        feature_existence_hallucination: r.feature_existence_hallucination,
+        feature_value_hallucination: r.feature_value_hallucination,
+        comparison_hallucination: r.comparison_hallucination,
+        logic: r.logic,
+        explanation_sufficiency: r.explanation_sufficiency,
+        explanation_necessity: r.explanation_necessity,
+        comment: r.comment||""
+      };
       if(fullyScored(evals[i])) savedSnapshot[i] = snapshotOf(i);
     });
   }catch(err){
