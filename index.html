@@ -231,6 +231,7 @@ header{
   <div id="topctrl" class="hidden" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
     <span class="who" id="whoami"></span>
     <div class="prog-wrap"><div class="bar"><span id="progbar"></span></div><span class="pcount" id="pcount">0/0 scored</span></div>
+    <button class="btn btn-primary" id="btnSubmit" disabled>Submit (0)</button>
     <button class="btn btn-ghost" id="btnClearAll" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>Clear All</button>
     <button class="btn btn-ghost" id="btnSignout" title="Switch evaluator"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
   </div>
@@ -284,8 +285,6 @@ Or select the data file(s) manually below &darr;
         <div class="dim-top"><span class="dim-name">Comments</span><span class="dim-en">Optional</span></div>
         <textarea class="comment" id="comment" placeholder="Note key issues, strengths, or suggestions..."></textarea>
       </div>
-      <button id="btnSubmit" class="btn btn-primary submit-btn" disabled>Submit this case</button>
-      <div id="submitMsg" class="submit-msg"></div>
       <button id="btnClearOne" class="clear-one" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Clear this case's score</button>
     </aside>
   </div>
@@ -386,7 +385,7 @@ const els = {
   prevBtn:$("prevBtn"), nextBtn:$("nextBtn"), caseCount:$("caseCount"), crumb:$("crumb"), navgroups:$("navgroups"),
   sidebar:$("sidebar"), sideCollapse:$("sideCollapse"),
   content:$("content"), dims:$("dims"), comment:$("comment"),
-  doneFlag:$("doneFlag"), btnSubmit:$("btnSubmit"), submitMsg:$("submitMsg"),
+  doneFlag:$("doneFlag"), btnSubmit:$("btnSubmit"),
   login:$("login"), loginName:$("loginName"), loginBtn:$("loginBtn"), loginMsg:$("loginMsg"),
 };
 
@@ -521,43 +520,16 @@ function renderPanel(){
   });
   els.comment.value = e.comment || "";
   els.doneFlag.innerHTML = fullyScored(e) ? '<span class="done-flag">'+CHECKCIRC+' Done</span>' : "";
-  renderSubmit();
 }
 
-// Reflect the current case's submit state on the Submit button
-function renderSubmit(){
-  const b = els.btnSubmit, m = els.submitMsg;
-  b.classList.remove("is-update","is-done");
-  m.className = "submit-msg"; m.textContent = "";
-  if(!supa){
-    b.disabled = true; b.textContent = "Submit (database not configured)";
-    m.textContent = "Set SUPABASE_URL / ANON_KEY to enable saving.";
-    return;
-  }
-  if(b.dataset.busy === "1"){ b.disabled = true; b.textContent = "Submitting…"; return; }
-  const filled = fullyScored(evals[idx]);
-  if(!filled){
-    b.disabled = true; b.textContent = "Submit this case";
-    m.textContent = "Score all four dimensions to submit.";
-    return;
-  }
-  if(isSubmitted(idx) && !isDirty(idx)){
-    b.disabled = true; b.classList.add("is-done"); b.textContent = "Submitted \u2713";
-    m.classList.add("ok"); m.textContent = "Saved. Re-score to update.";
-  }else if(isSubmitted(idx) && isDirty(idx)){
-    b.disabled = false; b.classList.add("is-update"); b.textContent = "Update submission";
-    m.textContent = "Unsaved changes since last submit.";
-  }else{
-    b.disabled = false; b.textContent = "Submit this case";
-  }
-}
+// A case is "pending" if it's fully scored and differs from what's in the DB (new or edited)
+function isPending(i){ const s=snapshotOf(i); return s!=null && s!==savedSnapshot[i]; }
+function pendingIndices(){ return Object.keys(evals).map(Number).filter(isPending); }
 
-// Write the current case to Supabase (upsert: one row per evaluator+case)
-async function submitCase(){
-  if(!supa || !fullyScored(evals[idx])) return;
-  const i = idx, c = cases[i], e = evals[i];
-  els.btnSubmit.dataset.busy = "1"; renderSubmit();
-  const row = {
+// Build a DB row for a case from its current local scores
+function rowFor(i){
+  const c = cases[i], e = evals[i];
+  return {
     evaluator: evaluatorName,
     case_index: i,
     case_id: (c && (c.id!=null?String(c.id):(c.idx!=null?String(c.idx):null))),
@@ -566,23 +538,63 @@ async function submitCase(){
     is_correct: isCorrect(c),
     accuracy: e.accuracy, logic: e.logic, completeness: e.completeness, safety: e.safety,
     comment: e.comment || "",
+    cleared: false,
     updated_at: new Date().toISOString(),
   };
+}
+
+// Reflect the global Submit button state (count of pending changes)
+function renderSubmitButton(){
+  const b = els.btnSubmit;
+  b.classList.remove("is-update","is-done");
+  if(!supa){ b.disabled = true; b.textContent = "Submit (DB not configured)"; b.title="Set SUPABASE_URL / ANON_KEY"; return; }
+  if(b.dataset.busy === "1"){ b.disabled = true; b.textContent = "Submitting…"; return; }
+  const n = pendingIndices().length;
+  b.title = "";
+  if(n===0){ b.disabled = true; b.classList.add("is-done"); b.textContent = "All saved \u2713"; }
+  else { b.disabled = false; b.textContent = "Submit ("+n+")"; }
+}
+
+// Submit ALL pending (fully-scored, changed) cases in one batch
+async function submitAll(){
+  if(!supa) return;
+  const idxs = pendingIndices();
+  if(!idxs.length) return;
+  els.btnSubmit.dataset.busy = "1"; renderSubmitButton();
   try{
-    const { error } = await supa.from(SUPABASE_TABLE).upsert(row, { onConflict: "evaluator,case_index" });
+    const rows = idxs.map(rowFor);
+    const { error } = await supa.from(SUPABASE_TABLE).upsert(rows, { onConflict: "evaluator,case_index" });
     els.btnSubmit.dataset.busy = "0";
     if(error) throw error;
-    savedSnapshot[i] = snapshotOf(i);
-    renderSubmit(); renderNav(); updateProgress();
+    idxs.forEach(i=>{ savedSnapshot[i] = snapshotOf(i); });
+    renderSubmitButton(); renderNav(); updateProgress();
   }catch(err){
     els.btnSubmit.dataset.busy = "0";
-    renderSubmit();
-    els.submitMsg.className = "submit-msg bad";
-    els.submitMsg.textContent = "Submit failed: " + (err.message || err) + " — try again.";
+    renderSubmitButton();
+    showErr("Submit failed: " + (err.message || err) + " — please try again.");
   }
 }
 
-// Load this evaluator's existing submissions from the DB into the UI
+// Mark already-submitted cases as cleared in the DB (scores nulled, row kept for audit)
+async function clearInDb(indices){
+  if(!supa || !indices.length) return;
+  const rows = indices.map(i=>{
+    const c = cases[i];
+    return {
+      evaluator: evaluatorName, case_index: i,
+      case_id: (c && (c.id!=null?String(c.id):(c.idx!=null?String(c.idx):null))),
+      group_name: GROUP_NAME[groupKeyOf(c)] || null, label: labelOf(c), is_correct: isCorrect(c),
+      accuracy: null, logic: null, completeness: null, safety: null, comment: "",
+      cleared: true, updated_at: new Date().toISOString(),
+    };
+  });
+  try{
+    const { error } = await supa.from(SUPABASE_TABLE).upsert(rows, { onConflict: "evaluator,case_index" });
+    if(error) throw error;
+  }catch(err){ showErr("Clear failed to sync to database: " + (err.message||err)); }
+}
+
+// Load this evaluator's existing (non-cleared) submissions from the DB into the UI
 async function loadEvaluatorRows(){
   evals = {}; savedSnapshot = {};
   if(!supa) return;
@@ -592,6 +604,7 @@ async function loadEvaluatorRows(){
     (data||[]).forEach(r=>{
       const i = r.case_index;
       if(i==null || i<0 || !cases || i>=cases.length) return;
+      if(r.cleared) return;   // cleared rows count as un-scored
       evals[i] = { accuracy:r.accuracy, logic:r.logic, completeness:r.completeness, safety:r.safety, comment:r.comment||"" };
       if(fullyScored(evals[i])) savedSnapshot[i] = snapshotOf(i);
     });
@@ -727,8 +740,9 @@ function updateProgress(){
   const t=cases.length, sub=submittedCount();
   els.progbar.style.width = (t?Math.round(sub/t*100):0)+"%";
   els.pcount.textContent = sub+"/"+t+" submitted";
-  els.btnClearAll.disabled = !anyData();
-  els.btnClearOne.disabled = !caseHasData(idx);
+  els.btnClearAll.disabled = !anyData() && submittedCount()===0;
+  els.btnClearOne.disabled = !caseHasData(idx) && !isSubmitted(idx);
+  renderSubmitButton();
 }
 
 function goTo(i){
@@ -759,21 +773,28 @@ els.prevBtn.addEventListener("click",()=>stepNav(-1));
 els.nextBtn.addEventListener("click",()=>stepNav(1));
 els.sideCollapse.addEventListener("click",toggleSidebar);
 els.btnClearOne.addEventListener("click",()=>{
-  if(!caseHasData(idx)) return;
-  if(!window.confirm("Clear the score and comment for this case (Case "+(idx+1)+")?\n\nThis cannot be undone.")) return;
+  const had = caseHasData(idx), wasSubmitted = isSubmitted(idx);
+  if(!had && !wasSubmitted) return;
+  if(!window.confirm("Clear the score and comment for this case?\n\nIf it was already submitted, it will be withdrawn in the database (kept for audit, scores cleared).")) return;
   delete evals[idx];
+  if(wasSubmitted){ const i=idx; delete savedSnapshot[i]; clearInDb([i]); }
   renderPanel(); renderNav(); updateProgress(); saveState();
 });
 els.btnClearAll.addEventListener("click",()=>{
-  if(!anyData()) return;
-  const n = Object.keys(evals).filter(i=>caseHasData(i)).length;
-  if(!window.confirm("Clear ALL scores and comments? This cannot be undone.\n\n("+n+" case"+(n===1?"":"s")+" will be reset.)")) return;
-  evals = {};
-  idx = 0;
+  const localN = Object.keys(evals).filter(i=>caseHasData(i)).length;
+  const submittedIdx = Object.keys(savedSnapshot).map(Number).filter(i=>savedSnapshot[i]!=null);
+  if(localN===0 && submittedIdx.length===0) return;
+  if(!window.confirm("Clear ALL scores and comments for "+evaluatorName+"?\n\nAlready-submitted cases will be withdrawn in the database (kept for audit, scores cleared). This affects only your own evaluations.")) return;
+  evals = {}; savedSnapshot = {};
+  if(submittedIdx.length) clearInDb(submittedIdx);
+  if(orderSeq.length) idx = orderSeq[0];
   renderContent(); renderPanel(); renderNav(); updateProgress(); saveState();
 });
-els.comment.addEventListener("input",()=>{ evals[idx]=Object.assign({}, evals[idx], {comment:els.comment.value}); renderSubmit(); saveState(); });
-els.btnSubmit.addEventListener("click",submitCase);
+els.comment.addEventListener("input",()=>{ evals[idx]=Object.assign({}, evals[idx], {comment:els.comment.value}); updateProgress(); saveState(); });
+els.btnSubmit.addEventListener("click",submitAll);
+window.addEventListener("beforeunload",e=>{
+  if(cases && pendingIndices().length>0){ e.preventDefault(); e.returnValue = ""; }
+});
 document.addEventListener("keydown",e=>{
   if(!cases) return;
   const tag=document.activeElement&&document.activeElement.tagName;
