@@ -326,8 +326,8 @@ const SUPABASE_TABLE    = "evaluations";
 /* ▲▲▲  END OF SETTING  ▲▲▲ */
 const DIMENSIONS = [
   { key:"feature_existence_hallucination", label:"Feature Existence Hallucination", desc:"Does the reasoning cite features not present in the data?", type:"binary" },
-  { key:"feature_value_hallucination",     label:"Feature Value Hallucination",     desc:"Does it misstate a feature's value?", type:"binary" },
-  { key:"comparison_hallucination",        label:"Comparison Hallucination",        desc:"Invalid numerical or categorical comparisons are made.", type:"binary" },
+  { key:"feature_value_hallucination",     label:"Feature Value Hallucination",     desc:"Does the reasoning misstate a feature's value?", type:"binary" },
+  { key:"comparison_hallucination",        label:"Comparison Hallucination",        desc:"Does the reasoning make invalid numerical or categorical comparisons?", type:"binary" },
   { key:"logic",                    label:"Logic",                    desc:"Are the reasoning steps coherent and causally sound?", type:"scale", tone:"teal" },
   { key:"explanation_sufficiency",  label:"Explanation Sufficiency",  desc:"Is the explanation complete enough to justify the conclusion?", type:"scale", tone:"teal" },
   { key:"explanation_necessity",    label:"Explanation Necessity",    desc:"Is everything in the explanation necessary (no irrelevant padding)?", type:"scale", tone:"teal" },
