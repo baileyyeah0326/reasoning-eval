@@ -320,14 +320,14 @@ const DATA_SOURCES = [
    Find them in Supabase: Project Settings → API.
    Leave them empty to run offline (Submit will be disabled).
    ============================================================ */
-const SUPABASE_URL      = "https://nndkbviqczxqxqgncggd.supabase.co";   // e.g. "https://abcdefgh.supabase.co"
-const SUPABASE_ANON_KEY = "sb_publishable_cm4fMIaM-TfjTclOJIbMGw_SPzSKVeZ";   // the long "anon public" key
+const SUPABASE_URL      = "";   // e.g. "https://abcdefgh.supabase.co"
+const SUPABASE_ANON_KEY = "";   // the long "anon public" key
 const SUPABASE_TABLE    = "evaluations";
 /* ▲▲▲  END OF SETTING  ▲▲▲ */
 const DIMENSIONS = [
   { key:"feature_existence_hallucination", label:"Feature Existence Hallucination", desc:"Does the reasoning cite features not present in the data?", type:"binary" },
   { key:"feature_value_hallucination",     label:"Feature Value Hallucination",     desc:"Does it misstate a feature's value?", type:"binary" },
-  { key:"comparison_hallucination",        label:"Comparison Hallucination",        desc:"Are comparisons between values or thresholds fabricated or wrong?", type:"binary" },
+  { key:"comparison_hallucination",        label:"Comparison Hallucination",        desc:"Invalid numerical or categorical comparisons are made.", type:"binary" },
   { key:"logic",                    label:"Logic",                    desc:"Are the reasoning steps coherent and causally sound?", type:"scale", tone:"teal" },
   { key:"explanation_sufficiency",  label:"Explanation Sufficiency",  desc:"Is the explanation complete enough to justify the conclusion?", type:"scale", tone:"teal" },
   { key:"explanation_necessity",    label:"Explanation Necessity",    desc:"Is everything in the explanation necessary (no irrelevant padding)?", type:"scale", tone:"teal" },
