@@ -171,6 +171,19 @@ header{
 .bin-btn:hover{border-color:var(--teal);}
 .bin-none.sel{background:var(--teal);color:#fbf9f4;border-color:transparent;box-shadow:0 2px 0 var(--teal-d);}
 .bin-present.sel{background:var(--amber);color:#fbf9f4;border-color:transparent;box-shadow:0 2px 0 #7d4a0e;}
+/* prediction step */
+.pred-wrap{display:flex;flex-direction:column;gap:9px;margin-bottom:14px;}
+.pred-opt{text-align:left;padding:13px 15px;border-radius:10px;border:1px solid var(--line2);background:var(--paper);font-family:inherit;font-size:14px;font-weight:600;color:var(--ink);cursor:pointer;transition:all .12s ease;}
+.pred-opt:hover{border-color:var(--teal);}
+.pred-opt.sel{background:var(--teal);color:#fbf9f4;border-color:transparent;box-shadow:0 2px 0 var(--teal-d);}
+.pred-confirm{width:100%;justify-content:center;height:44px;font-size:14px;}
+.pred-confirm:disabled{opacity:.45;cursor:not-allowed;box-shadow:none;}
+.pred-note{font-size:11.5px;color:var(--ink3);margin-top:10px;text-align:center;}
+.pred-banner{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--teal-d);background:var(--teal-soft);border:1px solid var(--teal);border-radius:9px;padding:9px 13px;margin-bottom:16px;}
+.pred-banner b{font-weight:600;}
+.pred-lock{margin-left:auto;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--teal-d);background:#fff;border:1px solid var(--teal);border-radius:99px;padding:2px 8px;}
+.predict-hint{display:flex;align-items:flex-start;gap:9px;font-size:13.5px;line-height:1.6;color:var(--ink2);background:#f3e8d4;border:1px solid #e2cda3;border-radius:11px;padding:14px 16px;margin-top:8px;}
+.predict-hint svg{width:18px;height:18px;flex:0 0 auto;margin-top:1px;color:var(--amber);}
 .anchors{display:flex;justify-content:space-between;font-size:10.5px;color:var(--ink3);margin-top:5px;}
 .comment{width:100%;min-height:84px;resize:vertical;font-family:inherit;font-size:13.5px;line-height:1.6;padding:11px 12px;border:1px solid var(--line2);border-radius:10px;background:var(--paper);color:var(--ink);outline:none;}
 .comment:focus{border-color:var(--teal);}
@@ -283,10 +296,10 @@ Or select the data file(s) manually below &darr;
     </aside>
     <section class="content" id="content"></section>
     <aside class="panel">
-      <div class="panel-htop"><div class="panel-h">Score</div><span id="doneFlag"></span></div>
-      <div class="panel-sub">Hallucinations: None / Present &middot; Scales: 1 = Poor, 5 = Excellent</div>
+      <div class="panel-htop"><div class="panel-h" id="panelH">Score</div><span id="doneFlag"></span></div>
+      <div class="panel-sub" id="panelSub">Hallucinations: None / Present &middot; Scales: 1 = Poor, 5 = Excellent</div>
       <div id="dims"></div>
-      <div class="dim">
+      <div class="dim" id="commentBlock">
         <div class="dim-top"><span class="dim-name">Comments</span><span class="dim-en">Optional</span></div>
         <textarea class="comment" id="comment" placeholder="Note key issues, strengths, or suggestions..."></textarea>
       </div>
@@ -325,7 +338,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_cm4fMIaM-TfjTclOJIbMGw_SPzSKVeZ";   //
 const SUPABASE_TABLE    = "evaluations";
 /* ▲▲▲  END OF SETTING  ▲▲▲ */
 const DIMENSIONS = [
-  { key:"hallucination",            label:"Hallucination",            desc:"Does the reasoning contain any hallucination?", type:"binary" },
+  { key:"hallucination",            label:"Hallucination",            desc:"Does the reasoning contain any hallucination (non-existent features, wrong values, or invalid comparisons)?", type:"binary" },
   { key:"logic",                    label:"Logic",                    desc:"Are the reasoning steps coherent and causally sound?", type:"scale", tone:"teal" },
   { key:"consistency",              label:"Consistency",              desc:"Are the reasoning's statements consistent with each other and with the conclusion?", type:"scale", tone:"teal" },
   { key:"explanation_sufficiency",  label:"Explanation Sufficiency",  desc:"Is the explanation complete enough to justify the conclusion?", type:"scale", tone:"teal" },
@@ -370,6 +383,7 @@ const LS_KEY = "reasoning_eval_state_v4_sourcegroups";
 let cases = null, fileName = "", idx = 0;
 let evals = {};            // { i: {hallucination, logic, consistency, explanation_sufficiency, explanation_necessity, comment} }
 let savedSnapshot = {};    // { i: canonical string of what is currently saved in the DB }
+let dbRows = {};           // { i: true } when a row for this case exists in the DB (predicted or scored)
 let evaluatorName = "";    // logged-in evaluator
 let displayFields = [];   // fixed display fields (filtered by what exists in the data)
 let orderSeq = [];        // case indices in grouped display order (for prev/next)
@@ -391,6 +405,7 @@ const els = {
   prevBtn:$("prevBtn"), nextBtn:$("nextBtn"), caseCount:$("caseCount"), crumb:$("crumb"), navgroups:$("navgroups"),
   sidebar:$("sidebar"), sideCollapse:$("sideCollapse"),
   content:$("content"), dims:$("dims"), comment:$("comment"),
+  panelH:$("panelH"), panelSub:$("panelSub"), commentBlock:$("commentBlock"),
   doneFlag:$("doneFlag"), btnSubmit:$("btnSubmit"),
   login:$("login"), loginName:$("loginName"), loginBtn:$("loginBtn"), loginMsg:$("loginMsg"),
 };
@@ -424,14 +439,16 @@ function orderFields(fields){
   });
 }
 function esc(s){ return String(s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
-function fullyScored(e){ return e && DIMENSIONS.every(d=>e[d.key]!=null); }
+function hadDbRow(i){ return !!dbRows[i]; }
+function hasPrediction(i){ const e=evals[i]; return !!(e && e.doctor_prediction!=null && e.doctor_prediction!==""); }
+function fullyScored(e){ return e && e.doctor_prediction!=null && e.doctor_prediction!=="" && DIMENSIONS.every(d=>e[d.key]!=null); }
 function doneCount(){ return Object.keys(evals).filter(i=>fullyScored(evals[i])).length; }
 
-// canonical string of a case's current scores+comment (null if not all dims filled)
+// canonical string of a case's prediction + scores + comment (null if not complete)
 function snapshotOf(i){
   const e = evals[i];
   if(!fullyScored(e)) return null;
-  return JSON.stringify(DIMENSIONS.map(d=>e[d.key]).concat([(e.comment||"")]));
+  return JSON.stringify([e.doctor_prediction].concat(DIMENSIONS.map(d=>e[d.key])).concat([(e.comment||"")]));
 }
 function isSubmitted(i){ return savedSnapshot[i]!=null; }
 function isDirty(i){ const s=snapshotOf(i); return s!=null && savedSnapshot[i]!=null && s!==savedSnapshot[i]; }
@@ -491,8 +508,11 @@ function renderContent(){
     d.innerHTML='<div class="fkey">Content</div>'+renderValue(cur);
     els.content.appendChild(d); return;
   }
+  const predicted = hasPrediction(idx);
   fields.forEach((k,n)=>{
     const cls = classifyKey(k); const v = cur[k];
+    // Step 1 (no prediction yet): show only features — hide reasoning and the true label
+    if(!predicted && (cls==="reason" || cls==="answer")) return;
     const d=document.createElement("div"); d.className="field "+cls; d.style.animationDelay=(n*0.04)+"s";
     let body;
     if(cls==="id") body='<span class="idbadge">#'+esc(v)+'</span>';
@@ -502,47 +522,78 @@ function renderContent(){
     d.innerHTML='<div class="fkey">'+(cls==="reason"?BRAIN:"")+esc(k)+'</div>'+body;
     els.content.appendChild(d);
   });
+  if(!predicted){
+    const note=document.createElement("div");
+    note.className="predict-hint";
+    note.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>Review the features, then predict the diagnosis on the right. The reasoning and true label appear after you confirm.';
+    els.content.appendChild(note);
+  }
   els.content.scrollTop=0;
 }
 
-// ── Render scoring panel ──
+// ── Render scoring panel (two steps) ──
+let predPick = null;   // transient: class chosen but not yet confirmed (step 1)
+
 function renderPanel(){
   const e = evals[idx] || {};
-  els.dims.innerHTML = DIMENSIONS.map(d=>{
-    let control;
+  const predicted = hasPrediction(idx);
+
+  els.commentBlock.style.display = predicted ? "" : "none";
+  els.btnClearOne.style.display = predicted ? "" : "none";
+
+  if(!predicted){
+    // Step 1 — predict from features only
+    els.panelH.textContent = "Step 1 · Predict";
+    els.panelSub.textContent = "Predict the diagnosis from the features. This can't be changed once confirmed.";
+    els.doneFlag.innerHTML = "";
+    const opts = LABEL_ORDER.map(l=>'<button class="pred-opt'+(predPick===l?" sel":"")+'" data-pred="'+esc(l)+'">'+esc(l)+'</button>').join("");
+    els.dims.innerHTML = '<div class="pred-wrap">'+opts+'</div>'+
+      '<button id="btnConfirmPred" class="btn btn-primary pred-confirm"'+(predPick?"":" disabled")+'>Confirm prediction</button>'+
+      '<div class="pred-note">You won\u2019t be able to change this after confirming.</div>';
+    els.dims.querySelectorAll(".pred-opt").forEach(b=>b.addEventListener("click",()=>{ predPick=b.dataset.pred; renderPanel(); }));
+    const cf=$("btnConfirmPred"); if(cf) cf.addEventListener("click",confirmPrediction);
+    return;
+  }
+
+  // Step 2 — prediction locked, score the reasoning
+  els.panelH.textContent = "Step 2 · Score";
+  els.panelSub.textContent = "Hallucination: None / Present \u00b7 Scales: 1 = Poor, 5 = Excellent";
+  const banner = '<div class="pred-banner">Your prediction: <b>'+esc(e.doctor_prediction)+'</b><span class="pred-lock">locked</span></div>';
+  els.dims.innerHTML = banner + DIMENSIONS.map(d=>{
     if(d.type==="binary"){
-      // false = None (no hallucination, good); true = Present (hallucination, bad)
       const none = '<button class="bin-btn bin-none'+(e[d.key]===false?" sel":"")+'" data-dim="'+d.key+'" data-bin="0">None</button>';
       const pres = '<button class="bin-btn bin-present'+(e[d.key]===true?" sel":"")+'" data-dim="'+d.key+'" data-bin="1">Present</button>';
-      control = '<div class="binary">'+none+pres+'</div>';
-      return '<div class="dim binary-dim">'+
-        '<div class="dim-top"><span class="dim-name">'+d.label+'</span></div>'+
-        '<div class="dim-desc">'+d.desc+'</div>'+ control + '</div>';
+      return '<div class="dim binary-dim"><div class="dim-top"><span class="dim-name">'+d.label+'</span></div>'+
+        '<div class="dim-desc">'+d.desc+'</div><div class="binary">'+none+pres+'</div></div>';
     }
     const dots = SCALE.map(n=>'<button class="dot'+(e[d.key]===n?" sel":"")+'" data-dim="'+d.key+'" data-val="'+n+'">'+n+'</button>').join("");
-    return '<div class="dim '+(d.tone||"teal")+'">'+
-      '<div class="dim-top"><span class="dim-name">'+d.label+'</span></div>'+
-      '<div class="dim-desc">'+d.desc+'</div>'+
-      '<div class="scale">'+dots+'</div>'+
-      '<div class="anchors"><span>Poor</span><span>Excellent</span></div>'+
-    '</div>';
+    return '<div class="dim '+(d.tone||"teal")+'"><div class="dim-top"><span class="dim-name">'+d.label+'</span></div>'+
+      '<div class="dim-desc">'+d.desc+'</div><div class="scale">'+dots+'</div>'+
+      '<div class="anchors"><span>Poor</span><span>Excellent</span></div></div>';
   }).join("");
-  els.dims.querySelectorAll(".dot").forEach(btn=>{
-    btn.addEventListener("click",()=>{
-      const dim=btn.dataset.dim, val=+btn.dataset.val;
-      evals[idx]=Object.assign({}, evals[idx], {[dim]:val});
-      renderPanel(); renderNav(); updateProgress(); saveState();
-    });
-  });
-  els.dims.querySelectorAll(".bin-btn").forEach(btn=>{
-    btn.addEventListener("click",()=>{
-      const dim=btn.dataset.dim, val=(btn.dataset.bin==="1");
-      evals[idx]=Object.assign({}, evals[idx], {[dim]:val});
-      renderPanel(); renderNav(); updateProgress(); saveState();
-    });
-  });
+  els.dims.querySelectorAll(".dot").forEach(btn=>btn.addEventListener("click",()=>{
+    evals[idx]=Object.assign({}, evals[idx], {[btn.dataset.dim]:+btn.dataset.val});
+    renderPanel(); renderNav(); updateProgress(); saveState();
+  }));
+  els.dims.querySelectorAll(".bin-btn").forEach(btn=>btn.addEventListener("click",()=>{
+    evals[idx]=Object.assign({}, evals[idx], {[btn.dataset.dim]:(btn.dataset.bin==="1")});
+    renderPanel(); renderNav(); updateProgress(); saveState();
+  }));
   els.comment.value = e.comment || "";
   els.doneFlag.innerHTML = fullyScored(e) ? '<span class="done-flag">'+CHECKCIRC+' Done</span>' : "";
+}
+
+// Confirm the step-1 prediction: lock it, reveal reasoning + label, save it immediately
+async function confirmPrediction(){
+  if(!predPick) return;
+  const i = idx;
+  evals[i] = Object.assign({}, evals[i], {doctor_prediction: predPick});
+  predPick = null;
+  renderContent(); renderPanel(); renderNav(); updateProgress(); saveState();
+  if(supa){
+    try{ const { error } = await supa.from(SUPABASE_TABLE).upsert(rowFor(i), { onConflict:"evaluator,case_index" }); if(error) throw error; dbRows[i]=true; }
+    catch(err){ showErr("Could not save prediction: "+(err.message||err)); }
+  }
 }
 
 // A case is "pending" if it's fully scored and differs from what's in the DB (new or edited)
@@ -559,11 +610,12 @@ function rowFor(i){
     group_name: GROUP_NAME[groupKeyOf(c)] || null,
     label: labelOf(c),
     is_correct: isCorrect(c),
-    hallucination: e.hallucination,
-    logic: e.logic,
-    consistency: e.consistency,
-    explanation_sufficiency: e.explanation_sufficiency,
-    explanation_necessity: e.explanation_necessity,
+    doctor_prediction: e.doctor_prediction!=null ? e.doctor_prediction : null,
+    hallucination: e.hallucination!=null ? e.hallucination : null,
+    logic: e.logic!=null ? e.logic : null,
+    consistency: e.consistency!=null ? e.consistency : null,
+    explanation_sufficiency: e.explanation_sufficiency!=null ? e.explanation_sufficiency : null,
+    explanation_necessity: e.explanation_necessity!=null ? e.explanation_necessity : null,
     comment: e.comment || "",
     cleared: false,
     updated_at: new Date().toISOString(),
@@ -593,7 +645,7 @@ async function submitAll(){
     const { error } = await supa.from(SUPABASE_TABLE).upsert(rows, { onConflict: "evaluator,case_index" });
     els.btnSubmit.dataset.busy = "0";
     if(error) throw error;
-    idxs.forEach(i=>{ savedSnapshot[i] = snapshotOf(i); });
+    idxs.forEach(i=>{ savedSnapshot[i] = snapshotOf(i); dbRows[i]=true; });
     renderSubmitButton(); renderNav(); updateProgress();
   }catch(err){
     els.btnSubmit.dataset.busy = "0";
@@ -607,12 +659,15 @@ async function clearInDb(indices){
   if(!supa || !indices.length) return;
   const rows = indices.map(i=>{
     const c = cases[i];
+    const pred = (evals[i] && evals[i].doctor_prediction!=null) ? evals[i].doctor_prediction : null;
     return {
       evaluator: evaluatorName, case_index: i,
       case_id: (c && (c.id!=null?String(c.id):(c.idx!=null?String(c.idx):null))),
       group_name: GROUP_NAME[groupKeyOf(c)] || null, label: labelOf(c), is_correct: isCorrect(c),
+      doctor_prediction: pred,   // prediction is locked: it stays
       hallucination: null, logic: null, consistency: null, explanation_sufficiency: null, explanation_necessity: null, comment: "",
-      cleared: true, updated_at: new Date().toISOString(),
+      cleared: (pred==null),     // only fully withdraw if there was no prediction to keep
+      updated_at: new Date().toISOString(),
     };
   });
   try{
@@ -623,7 +678,7 @@ async function clearInDb(indices){
 
 // Load this evaluator's existing (non-cleared) submissions from the DB into the UI
 async function loadEvaluatorRows(){
-  evals = {}; savedSnapshot = {};
+  evals = {}; savedSnapshot = {}; dbRows = {};
   if(!supa) return;
   try{
     const { data, error } = await supa.from(SUPABASE_TABLE).select("*").eq("evaluator", evaluatorName);
@@ -632,7 +687,9 @@ async function loadEvaluatorRows(){
       const i = r.case_index;
       if(i==null || i<0 || !cases || i>=cases.length) return;
       if(r.cleared) return;   // cleared rows count as un-scored
+      dbRows[i] = true;
       evals[i] = {
+        doctor_prediction: r.doctor_prediction!=null ? r.doctor_prediction : null,
         hallucination: r.hallucination,
         logic: r.logic,
         consistency: r.consistency,
@@ -765,6 +822,13 @@ function toggleSidebar(){ els.sidebar.classList.toggle("collapsed"); }
 function caseHasData(i){
   const e = evals[i];
   if(!e) return false;
+  if(e.doctor_prediction!=null && e.doctor_prediction!=="") return true;
+  if((e.comment||"").trim()!=="") return true;
+  return DIMENSIONS.some(d=>e[d.key]!=null);
+}
+function caseHasScores(i){
+  const e = evals[i];
+  if(!e) return false;
   if((e.comment||"").trim()!=="") return true;
   return DIMENSIONS.some(d=>e[d.key]!=null);
 }
@@ -774,13 +838,14 @@ function updateProgress(){
   const t=cases.length, sub=submittedCount();
   els.progbar.style.width = (t?Math.round(sub/t*100):0)+"%";
   els.pcount.textContent = sub+"/"+t+" submitted";
-  els.btnClearAll.disabled = !anyData() && submittedCount()===0;
-  els.btnClearOne.disabled = !caseHasData(idx) && !isSubmitted(idx);
+  els.btnClearAll.disabled = !anyData() && submittedCount()===0 && Object.keys(dbRows).length===0;
+  els.btnClearOne.disabled = !caseHasData(idx) && !hadDbRow(idx);
   renderSubmitButton();
 }
 
 function goTo(i){
   idx = Math.max(0, Math.min(cases.length-1, i));
+  predPick = null;   // discard any unconfirmed step-1 pick when moving cases
   renderContent(); renderPanel(); renderNav(); updateProgress(); saveState();
 }
 
@@ -809,18 +874,21 @@ els.sideCollapse.addEventListener("click",toggleSidebar);
 els.btnClearOne.addEventListener("click",()=>{
   const had = caseHasData(idx), wasSubmitted = isSubmitted(idx);
   if(!had && !wasSubmitted) return;
-  if(!window.confirm("Clear the score and comment for this case?\n\nIf it was already submitted, it will be withdrawn in the database (kept for audit, scores cleared).")) return;
-  delete evals[idx];
-  if(wasSubmitted){ const i=idx; delete savedSnapshot[i]; clearInDb([i]); }
-  renderPanel(); renderNav(); updateProgress(); saveState();
+  if(!window.confirm("Clear EVERYTHING for this case — prediction, scores, and comment?\n\nThe case returns to the prediction step. If it was already submitted, it is withdrawn in the database (kept for audit).")) return;
+  const i=idx;
+  delete evals[i]; predPick=null;
+  if(wasSubmitted){ delete savedSnapshot[i]; }
+  if(hadDbRow(i)) clearInDb([i]);
+  renderContent(); renderPanel(); renderNav(); updateProgress(); saveState();
 });
 els.btnClearAll.addEventListener("click",()=>{
-  const localN = Object.keys(evals).filter(i=>caseHasData(i)).length;
+  const localIdx = Object.keys(evals).map(Number).filter(i=>caseHasData(i));
   const submittedIdx = Object.keys(savedSnapshot).map(Number).filter(i=>savedSnapshot[i]!=null);
-  if(localN===0 && submittedIdx.length===0) return;
-  if(!window.confirm("Clear ALL scores and comments for "+evaluatorName+"?\n\nAlready-submitted cases will be withdrawn in the database (kept for audit, scores cleared). This affects only your own evaluations.")) return;
-  evals = {}; savedSnapshot = {};
-  if(submittedIdx.length) clearInDb(submittedIdx);
+  const dbIdx = [...new Set(localIdx.concat(submittedIdx))];   // anything that may have a DB row
+  if(!dbIdx.length) return;
+  if(!window.confirm("Clear EVERYTHING for "+evaluatorName+" — all predictions, scores, and comments?\n\nEvery case returns to the prediction step. Submitted cases are withdrawn in the database (kept for audit). This affects only your own evaluations.")) return;
+  evals = {}; savedSnapshot = {}; predPick=null;
+  clearInDb(dbIdx);
   if(orderSeq.length) idx = orderSeq[0];
   renderContent(); renderPanel(); renderNav(); updateProgress(); saveState();
 });
@@ -831,8 +899,9 @@ window.addEventListener("beforeunload",e=>{
 });
 document.addEventListener("keydown",e=>{
   if(!cases) return;
-  const tag=document.activeElement&&document.activeElement.tagName;
-  if(tag==="TEXTAREA"||tag==="INPUT") return;
+  if(!els.login.classList.contains("hidden")) return;   // login overlay open
+  const ae=document.activeElement;
+  if(ae && ae.id==="comment") return;                   // typing a comment
   if(e.key==="ArrowLeft") stepNav(-1);
   if(e.key==="ArrowRight") stepNav(1);
 });
