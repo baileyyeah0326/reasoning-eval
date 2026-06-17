@@ -325,7 +325,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_cm4fMIaM-TfjTclOJIbMGw_SPzSKVeZ";   //
 const SUPABASE_TABLE    = "evaluations";
 /* ▲▲▲  END OF SETTING  ▲▲▲ */
 const DIMENSIONS = [
-  { key:"hallucination",            label:"Hallucination",            desc:"Does the reasoning contain any hallucination (non-existent features, wrong values, or invalid comparisons)?", type:"binary" },
+  { key:"hallucination",            label:"Hallucination",            desc:"Does the reasoning contain any hallucination?", type:"binary" },
   { key:"logic",                    label:"Logic",                    desc:"Are the reasoning steps coherent and causally sound?", type:"scale", tone:"teal" },
   { key:"consistency",              label:"Consistency",              desc:"Are the reasoning's statements consistent with each other and with the conclusion?", type:"scale", tone:"teal" },
   { key:"explanation_sufficiency",  label:"Explanation Sufficiency",  desc:"Is the explanation complete enough to justify the conclusion?", type:"scale", tone:"teal" },
