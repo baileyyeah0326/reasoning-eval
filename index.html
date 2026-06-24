@@ -113,6 +113,8 @@ header{
 .chip{position:relative;flex:0 0 auto;min-width:30px;height:30px;padding:0 7px;border-radius:7px;border:1px solid var(--line2);background:var(--card);color:var(--ink2);font-size:12px;font-family:'IBM Plex Mono',monospace;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:3px;transition:all .12s ease;}
 .chip:hover{border-color:var(--teal);color:var(--ink);}
 .chip.done{background:var(--teal-soft);border-color:var(--teal);color:var(--teal-d);}
+.chip.partial{background:#fff;border-color:var(--amber);color:var(--amber);}
+.nav-progress{font-size:11.5px;color:var(--ink2);font-weight:600;padding:4px 4px 10px;}
 .chip.active{background:var(--teal);border-color:var(--teal);color:#fbf9f4;box-shadow:0 2px 0 var(--teal-d);}
 /* misclassified cases: rose palette, overrides the teal variants above */
 .chip.wrong{background:#f6e3e1;border-color:#dca39d;color:var(--rose);}
@@ -322,7 +324,6 @@ Or select the data file(s) manually below &darr;
    cannot auto-load and falls back to manual selection.
    ============================================================ */
 const DATA_SOURCES = [
-  { url: "./data_complete.json", groupKey: "complete", groupName: "No missing values" },
   { url: "./data_unknown.json",  groupKey: "missing",  groupName: "Has missing values" },
 ];
 /* ▲▲▲  END OF SETTING  ▲▲▲ */
@@ -333,8 +334,8 @@ const DATA_SOURCES = [
    Find them in Supabase: Project Settings → API.
    Leave them empty to run offline (Submit will be disabled).
    ============================================================ */
-const SUPABASE_URL      = "https://nndkbviqczxqxqgncggd.supabase.co";   // e.g. "https://abcdefgh.supabase.co"
-const SUPABASE_ANON_KEY = "sb_publishable_cm4fMIaM-TfjTclOJIbMGw_SPzSKVeZ";   // the long "anon public" key
+const SUPABASE_URL      = "";   // e.g. "https://abcdefgh.supabase.co"
+const SUPABASE_ANON_KEY = "";   // the long "anon public" key
 const SUPABASE_TABLE    = "evaluations";
 /* ▲▲▲  END OF SETTING  ▲▲▲ */
 const DIMENSIONS = [
@@ -718,92 +719,34 @@ function groupKeyOf(c){
   return GROUP_NAME[gk]!=null ? gk : (MISSING_GROUPS[0] ? MISSING_GROUPS[0].key : "complete");
 }
 
-function computeGroups(){
-  const groups = MISSING_GROUPS.map(mg=>({key:mg.key, name:mg.name, subs:[], idxs:[], done:0, total:0}));
-  const byKey = {}; groups.forEach(g=>byKey[g.key]=g);
-  const tmp = {}; groups.forEach(g=>tmp[g.key]={});
-  cases.forEach((c,i)=>{
-    const gk = groupKeyOf(c), lab = labelOf(c);
-    if(!tmp[gk]) return;                 // case from an unknown group: skip in nav (still in data)
-    (tmp[gk][lab] = tmp[gk][lab] || []).push(i);
-  });
-  groups.forEach(g=>{
-    const present = Object.keys(tmp[g.key]);
-    const ordered = LABEL_ORDER.filter(l=>present.includes(l))
-      .concat(present.filter(l=>!LABEL_ORDER.includes(l)).sort());
-    ordered.forEach(lab=>{
-      // correctly classified first, misclassified pushed to the end (order preserved within each)
-      const raw = tmp[g.key][lab];
-      const idxs = raw.filter(i=>isCorrect(cases[i])).concat(raw.filter(i=>!isCorrect(cases[i])));
-      g.subs.push({ label:lab, idxs });
-      g.idxs.push(...idxs);
-      g.total += idxs.length;
-      g.done  += idxs.filter(i=>fullyScored(evals[i])).length;
-    });
-  });
+// Flat display order — no grouping, no labels (prevents leaking the answer during blind prediction)
+function computeOrder(){
   const order = [];
-  const localId = {};
-  groups.forEach(g=>g.subs.forEach(s=>{
-    s.idxs.forEach((gi,pos)=>{ localId[gi]=pos; });   // 0-based numbering, restarts per (group × label) category
-    order.push(...s.idxs);
-  }));
-  return { groups, order, localId };
-}
-function crumbFor(i){
-  const c = cases[i];
-  return (GROUP_NAME[groupKeyOf(c)] || "") + "  \u00b7  " + labelOf(c);
+  for(let i=0;i<cases.length;i++) order.push(i);
+  return { order };
 }
 
-// ── Render grouped navigator ──
+// ── Render flat navigator (no labels, no groups, no correctness — blind-safe) ──
 function renderNav(){
-  const { groups, localId } = computeGroups();
-  els.caseCount.textContent = "#"+(localId[idx]!=null ? localId[idx] : idx);
-  els.crumb.textContent = crumbFor(idx);
+  els.caseCount.textContent = "Case "+(idx+1)+" / "+cases.length;
+  els.crumb.textContent = "";
 
-  let html = "";
-  if(cases.some(c=>!isCorrect(c))){
-    html += '<div class="nav-legend"><span class="leg-swatch"></span>Misclassified cases (shown last in each section)</div>';
+  let done=0; for(let i=0;i<cases.length;i++) if(fullyScored(evals[i])) done++;
+  let html = '<div class="nav-progress">'+done+' / '+cases.length+' completed</div><div class="chips">';
+  for(let i=0;i<cases.length;i++){
+    const full = fullyScored(evals[i]);
+    const part = !full && hasPrediction(i);
+    const cls = "chip"+(i===idx?" active":"")+(full?" done":(part?" partial":""));
+    const inner = (full && i!==idx) ? CHECK : (i+1);
+    const dot = isSubmitted(i) ? '<span class="chip-dot"></span>' : "";
+    const state = full ? "completed" : (part ? "predicted, not scored" : "not started");
+    html += '<button class="'+cls+'" data-i="'+i+'" title="Case '+(i+1)+' \u00b7 '+state+'">'+inner+dot+'</button>';
   }
-  groups.forEach(g=>{
-    if(!g.total) return;
-    const collapsed = !!collapsedGroups[g.key];
-    html += '<div class="navgroup">';
-    html += '<button class="navg-head" data-grp="'+g.key+'">'+
-              '<span class="navg-caret'+(collapsed?" col":"")+'">\u25be</span>'+
-              '<span class="navg-name">'+esc(g.name)+'</span>'+
-              '<span class="navg-count">'+g.done+'/'+g.total+'</span>'+
-            '</button>';
-    if(!collapsed){
-      g.subs.forEach(sub=>{
-        if(!sub.idxs.length) return;
-        const wrongCount = sub.idxs.filter(i=>!isCorrect(cases[i])).length;
-        html += '<div class="navsub">'+
-                  '<div class="navsub-name">'+esc(sub.label)+'<span class="navsub-count">'+sub.idxs.length+
-                    (wrongCount?' <span class="navsub-wrong">'+wrongCount+' misclassified</span>':'')+'</span></div>'+
-                  '<div class="chips">'+
-                    sub.idxs.map(i=>{
-                      const done = fullyScored(evals[i]);
-                      const wrong = !isCorrect(cases[i]);
-                      const cls = "chip"+(wrong?" wrong":"")+(i===idx?" active":"")+(done?" done":"");
-                      const inner = (done && i!==idx) ? CHECK : localId[i];
-                      const dot = isSubmitted(i) ? '<span class="chip-dot"></span>' : "";
-                      return '<button class="'+cls+'" data-i="'+i+'" title="'+(wrong?'Misclassified':'Correct')+(isSubmitted(i)?' · submitted':'')+'">'+inner+dot+'</button>';
-                    }).join("")+
-                  '</div>'+
-                '</div>';
-      });
-    }
-    html += '</div>';
-  });
+  html += '</div>';
   els.navgroups.innerHTML = html;
 
   els.navgroups.querySelectorAll(".chip").forEach(c=>c.addEventListener("click",()=>goTo(+c.dataset.i)));
-  els.navgroups.querySelectorAll(".navg-head").forEach(h=>h.addEventListener("click",()=>{
-    collapsedGroups[h.dataset.grp] = !collapsedGroups[h.dataset.grp];
-    renderNav();
-  }));
 
-  // keep the current case visible in the sidebar
   const activeChip = els.navgroups.querySelector(".chip.active");
   if(activeChip && activeChip.scrollIntoView) activeChip.scrollIntoView({block:"nearest"});
 
@@ -855,7 +798,7 @@ function applyCases(list, fname){
   const keys = unionKeys(list);
   const def = DEFAULT_FIELDS.filter(k=>keys.includes(k));
   displayFields = def.length?def:keys;   // fall back to all fields if none match, to avoid a blank page
-  orderSeq = computeGroups().order;       // grouped display order (static for this dataset)
+  orderSeq = computeOrder().order;       // grouped display order (static for this dataset)
   collapsedGroups = {};                   // all groups expanded by default
   if(orderSeq.indexOf(idx)<0 && orderSeq.length) idx = orderSeq[0];
   els.emptyState.classList.add("hidden");
