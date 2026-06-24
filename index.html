@@ -262,7 +262,7 @@ header{
 <!-- Fallback UI when auto-load fails -->
 <div id="emptyState" class="empty-state hidden">
   <h2 class="serif">Could not load data automatically</h2>
-  <p class="lead" id="emptyMsg">The page failed to load the data files (<span class="mono" id="dataUrlLabel">data_complete.json, data_unknown.json</span>) automatically.<br>This usually happens when the file is opened by double-clicking &mdash; browsers block local pages from reading local files.</p>
+  <p class="lead" id="emptyMsg">The page failed to load the data file (<span class="mono" id="dataUrlLabel">data_subset.json</span>) automatically.<br>This usually happens when the file is opened by double-clicking &mdash; browsers block local pages from reading local files.</p>
   <div class="fmt" style="text-align:left;white-space:pre-wrap;">How to fix (either option):
 1) Host this file and the two data files on a server / intranet / static hosting;
 2) In the data folder, run:  python -m http.server
@@ -324,7 +324,7 @@ Or select the data file(s) manually below &darr;
    cannot auto-load and falls back to manual selection.
    ============================================================ */
 const DATA_SOURCES = [
-  { url: "./data_unknown.json",  groupKey: "missing",  groupName: "Has missing values" },
+  { url: "./data_subset.json",  groupKey: "missing",  groupName: "Selected subset" },
 ];
 /* ▲▲▲  END OF SETTING  ▲▲▲ */
 
@@ -334,8 +334,8 @@ const DATA_SOURCES = [
    Find them in Supabase: Project Settings → API.
    Leave them empty to run offline (Submit will be disabled).
    ============================================================ */
-const SUPABASE_URL      = "https://nndkbviqczxqxqgncggd.supabase.co";   // e.g. "https://abcdefgh.supabase.co"
-const SUPABASE_ANON_KEY = "sb_publishable_cm4fMIaM-TfjTclOJIbMGw_SPzSKVeZ";   // the long "anon public" key
+const SUPABASE_URL      = "";   // e.g. "https://abcdefgh.supabase.co"
+const SUPABASE_ANON_KEY = "";   // the long "anon public" key
 const SUPABASE_TABLE    = "evaluations";
 /* ▲▲▲  END OF SETTING  ▲▲▲ */
 const DIMENSIONS = [
