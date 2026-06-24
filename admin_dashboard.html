@@ -131,11 +131,10 @@ tr:last-child td{border-bottom:none;}
 <script>
 "use strict";
 /* ============ paste the SAME values as the evaluation page ============ */
-const SUPABASE_URL      = "https://nndkbviqczxqxqgncggd.supabase.co";   // e.g. "https://abcdefgh.supabase.co"
-const SUPABASE_ANON_KEY = "sb_publishable_cm4fMIaM-TfjTclOJIbMGw_SPzSKVeZ";   // the long "anon public" key
+const SUPABASE_URL      = "";
+const SUPABASE_ANON_KEY = "";
 const SUPABASE_TABLE    = "evaluations";
 const DATA_SOURCES = [
-  { url: "./data_complete.json", groupKey: "complete", groupName: "No missing values" },
   { url: "./data_unknown.json",  groupKey: "missing",  groupName: "Has missing values" },
 ];
 const FEATURE_LABELS = {
