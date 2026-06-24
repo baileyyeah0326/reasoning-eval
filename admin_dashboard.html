@@ -99,6 +99,8 @@ tr:last-child td{border-bottom:none;}
 .scell .sk{font-size:11px;color:var(--ink2);}
 .scell .sv{font-family:'Fraunces',serif;font-size:22px;font-weight:600;color:var(--teal-d);margin-top:2px;}
 .predrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+.back-btn{margin-bottom:16px;}
+.back-btn svg{width:15px;height:15px;}
 .cmtbox{margin-top:14px;font-size:13.5px;line-height:1.6;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:12px 14px;white-space:pre-wrap;}
 .cmtbox .rtitle{margin-bottom:5px;}
 .notice{font-size:13.5px;color:var(--ink2);background:var(--card);border:1px dashed var(--line2);border-radius:10px;padding:16px 18px;}
@@ -131,8 +133,8 @@ tr:last-child td{border-bottom:none;}
 <script>
 "use strict";
 /* ============ paste the SAME values as the evaluation page ============ */
-const SUPABASE_URL      = "";
-const SUPABASE_ANON_KEY = "";
+const SUPABASE_URL      = "https://nndkbviqczxqxqgncggd.supabase.co";   // e.g. "https://abcdefgh.supabase.co"
+const SUPABASE_ANON_KEY = "sb_publishable_cm4fMIaM-TfjTclOJIbMGw_SPzSKVeZ";   // the long "anon public" key
 const SUPABASE_TABLE    = "evaluations";
 const DATA_SOURCES = [
   { url: "./data_unknown.json",  groupKey: "missing",  groupName: "Has missing values" },
@@ -342,11 +344,13 @@ function renderCase(i){
   }
 
   $("main").innerHTML=
+    '<button class="btn back-btn" id="backBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>Back to overview</button>'+
     '<div class="casebox"><div class="case-head"><span class="case-id">#'+i+(any.case_id?'  \u00b7  id '+esc(any.case_id):'')+'</span>'+
       '<span class="case-label">'+esc(lab)+'</span><span class="tag">'+esc(grp)+'</span>'+corrTag+'</div>'+
       '<div class="case-cols"><div>'+fgrid+'</div><div><div class="rtitle">Reasoning</div><div class="reasoning">'+esc(reasoning)+'</div></div></div>'+
     '</div>'+
     '<h2>'+(e?esc(e)+"'s scoring":"Scoring")+'</h2>'+scoreHtml;
+  const bb=$("backBtn"); if(bb) bb.addEventListener("click",()=>{ selCase=null; renderNav(); renderMain(); });
 }
 
 function downloadCSV(){
