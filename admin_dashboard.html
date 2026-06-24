@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Evaluation Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --paper:#f3efe6; --paper2:#ece6d8; --card:#fbf9f4; --ink:#22262f; --ink2:#5a606e; --ink3:#8b8f9a;
+  --line:#ddd6c6; --line2:#cfc7b4; --teal:#0f6e60; --teal-d:#0a4f44; --teal-soft:#e3efe9;
+  --amber:#b06a16; --rose:#9d3a3a;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;}
+body{font-family:'IBM Plex Sans',system-ui,sans-serif;color:var(--ink);background:var(--paper);display:flex;flex-direction:column;height:100vh;overflow:hidden;}
+.mono{font-family:'IBM Plex Mono',monospace;}
+.muted{color:var(--ink3);}
+
+header{padding:14px 24px;border-bottom:1px solid var(--line2);background:var(--card);flex:0 0 auto;}
+h1{font-family:'Fraunces',serif;font-size:21px;font-weight:600;}
+.sub{font-size:12px;color:var(--ink2);margin-top:2px;}
+.bar{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-top:12px;}
+.fld{display:flex;flex-direction:column;gap:4px;}
+.fld label{font-size:10.5px;color:var(--ink2);font-weight:600;text-transform:uppercase;letter-spacing:.4px;}
+select{font-family:inherit;font-size:13px;padding:8px 10px;border:1px solid var(--line2);border-radius:8px;background:var(--paper);color:var(--ink);outline:none;min-width:200px;}
+select:focus{border-color:var(--teal);}
+.btn{display:inline-flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;font-weight:500;padding:9px 13px;border-radius:8px;border:1px solid var(--line2);background:var(--paper);color:var(--ink);}
+.btn:hover{background:var(--paper2);}
+.btn.primary{background:var(--teal);color:#fbf9f4;border-color:var(--teal);box-shadow:0 2px 0 var(--teal-d);}
+.msg{font-size:12.5px;color:var(--ink2);}
+.msg.bad{color:var(--rose);}
+.cfg{font-size:12.5px;color:var(--rose);background:#f6e3e1;border:1px solid #e3b8b3;padding:9px 13px;border-radius:9px;margin-top:10px;}
+.hidden{display:none !important;}
+
+.body{display:flex;flex:1 1 auto;min-height:0;}
+
+/* sidebar nav (mirrors the evaluation page) */
+.sidebar{flex:0 0 290px;width:290px;border-right:1px solid var(--line2);background:var(--paper);overflow-y:auto;}
+.side-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--paper);z-index:2;}
+.side-title{font-family:'Fraunces',serif;font-size:15px;font-weight:600;}
+.side-hint{font-size:11px;color:var(--ink3);}
+.navgroups{padding:8px 12px 18px;}
+.navgroup{margin-top:6px;}
+.navg-head{display:flex;align-items:center;gap:8px;width:100%;text-align:left;cursor:pointer;background:none;border:none;padding:6px 4px;color:var(--ink);}
+.navg-head:hover{color:var(--teal-d);}
+.navg-caret{font-size:11px;color:var(--ink3);transition:transform .15s ease;display:inline-block;}
+.navg-caret.col{transform:rotate(-90deg);}
+.navg-name{font-size:13px;font-weight:600;}
+.navg-count{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink3);background:var(--paper2);border:1px solid var(--line);border-radius:99px;padding:1px 8px;margin-left:auto;}
+.navsub{margin:2px 0 8px 16px;}
+.navsub-name{font-size:11px;color:var(--ink2);font-weight:500;margin:6px 0 5px;display:flex;align-items:center;gap:6px;}
+.navsub-count{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink3);}
+.navsub-wrong{color:var(--rose);font-weight:600;margin-left:6px;}
+.nav-legend{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--ink2);padding:2px 4px 8px;}
+.leg-swatch{width:14px;height:14px;border-radius:4px;background:#f6e3e1;border:1px solid #dca39d;display:inline-block;}
+.chips{display:flex;flex-wrap:wrap;gap:6px;padding:1px;}
+.chip{position:relative;flex:0 0 auto;min-width:30px;height:30px;padding:0 7px;border-radius:7px;border:1px solid var(--line2);background:var(--card);color:var(--ink2);font-size:12px;font-family:'IBM Plex Mono',monospace;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all .12s ease;}
+.chip:hover{border-color:var(--teal);color:var(--ink);}
+.chip.has{background:var(--teal-soft);border-color:var(--teal);color:var(--teal-d);}
+.chip.active{background:var(--teal);border-color:var(--teal);color:#fbf9f4;box-shadow:0 2px 0 var(--teal-d);}
+.chip.wrong{background:#f6e3e1;border-color:#dca39d;color:var(--rose);}
+.chip.wrong.has{background:#f1cfca;border-color:var(--rose);color:#7c2a2a;}
+.chip.wrong.active{background:var(--rose);border-color:var(--rose);color:#fff;box-shadow:0 2px 0 #6f2020;}
+
+/* main */
+.main{flex:1 1 auto;min-width:0;overflow-y:auto;padding:22px 26px 60px;}
+.cards{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px;}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 17px;min-width:140px;}
+.card .k{font-size:12px;color:var(--ink2);}
+.card .v{font-family:'Fraunces',serif;font-size:24px;font-weight:600;color:var(--teal-d);margin-top:3px;}
+h2{font-family:'Fraunces',serif;font-size:16px;font-weight:600;margin:22px 0 10px;}
+.wrap{overflow:auto;border-radius:10px;border:1px solid var(--line);}
+table{border-collapse:collapse;width:100%;background:var(--card);font-size:13px;}
+th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top;}
+th{background:var(--paper2);font-weight:600;font-size:12px;color:var(--ink2);}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;font-family:'IBM Plex Mono',monospace;}
+tr:last-child td{border-bottom:none;}
+.tag{font-size:11px;padding:2px 8px;border-radius:99px;border:1px solid var(--line2);background:var(--paper);}
+.tag.wrong{color:var(--rose);border-color:#dca39d;background:#f6e3e1;}
+.tag.ok{color:var(--teal-d);border-color:var(--teal);background:var(--teal-soft);}
+
+.casebox{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin-bottom:16px;}
+.case-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+.case-id{font-family:'IBM Plex Mono',monospace;font-size:13px;background:var(--paper2);border:1px solid var(--line2);border-radius:7px;padding:3px 10px;}
+.case-label{font-family:'Fraunces',serif;font-size:18px;font-weight:600;color:#8a520f;background:#f3e8d4;border:1px solid #e2cda3;border-radius:9px;padding:5px 14px;}
+.case-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:18px;}
+@media (max-width:980px){ .case-cols{grid-template-columns:1fr;} }
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden;align-self:start;}
+.fgrid .cell{background:var(--card);padding:8px 12px;display:flex;justify-content:space-between;gap:10px;}
+.fgrid .mk{font-size:12.5px;font-weight:600;}
+.fgrid .mv{font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums;}
+.rtitle{font-size:11px;color:var(--ink3);font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.5px;margin-bottom:7px;}
+.reasoning{font-size:14px;line-height:1.7;white-space:pre-wrap;word-break:break-word;background:#fbfbf7;border:1px solid var(--line);border-left:3px solid var(--teal);border-radius:10px;padding:14px 16px;max-height:360px;overflow:auto;}
+.scorebox{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;}
+.scell{flex:1 1 120px;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 14px;}
+.scell .sk{font-size:11px;color:var(--ink2);}
+.scell .sv{font-family:'Fraunces',serif;font-size:22px;font-weight:600;color:var(--teal-d);margin-top:2px;}
+.predrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+.cmtbox{margin-top:14px;font-size:13.5px;line-height:1.6;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:12px 14px;white-space:pre-wrap;}
+.cmtbox .rtitle{margin-bottom:5px;}
+.notice{font-size:13.5px;color:var(--ink2);background:var(--card);border:1px dashed var(--line2);border-radius:10px;padding:16px 18px;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Evaluation Dashboard</h1>
+  <div class="sub">Pick an evaluator, then a case on the left to see that evaluator's scoring with the reasoning.</div>
+  <div id="cfgWarn" class="cfg hidden">Set <span class="mono">SUPABASE_URL</span> and <span class="mono">SUPABASE_ANON_KEY</span> near the top of this file's &lt;script&gt; (same values as the evaluation page).</div>
+  <div class="bar">
+    <div class="fld"><label>Evaluator</label>
+      <select id="fEval"><option value="">All evaluators (overview)</option></select></div>
+    <button class="btn primary" id="refresh">Refresh</button>
+    <button class="btn" id="csv">Download CSV</button>
+    <label class="btn" style="cursor:default;">Auto-refresh<input type="checkbox" id="auto" style="margin-left:6px;" /></label>
+    <span class="msg" id="msg"></span>
+  </div>
+</header>
+
+<div class="body">
+  <aside class="sidebar">
+    <div class="side-head"><span class="side-title">Cases</span><span class="side-hint" id="sideHint"></span></div>
+    <div class="navgroups" id="navgroups"></div>
+  </aside>
+  <main class="main" id="main"></main>
+</div>
+
+<script>
+"use strict";
+/* ============ paste the SAME values as the evaluation page ============ */
+const SUPABASE_URL      = "https://nndkbviqczxqxqgncggd.supabase.co";   // e.g. "https://abcdefgh.supabase.co"
+const SUPABASE_ANON_KEY = "sb_publishable_cm4fMIaM-TfjTclOJIbMGw_SPzSKVeZ";   // the long "anon public" key
+const SUPABASE_TABLE    = "evaluations";
+const DATA_SOURCES = [
+  { url: "./data_complete.json", groupKey: "complete", groupName: "No missing values" },
+  { url: "./data_unknown.json",  groupKey: "missing",  groupName: "Has missing values" },
+];
+const FEATURE_LABELS = {
+  PTGENDER:"Sex", PTEDUCAT:"Education (years)", APOE4:"APOE \u03b54 alleles", AGE:"Age (years)",
+  CDRSB:"CDR-SB", ADAS11:"ADAS-Cog 11", ADAS13:"ADAS-Cog 13", MMSE:"MMSE",
+  RAVLT_immediate:"RAVLT Immediate Recall", Hippocampus:"Hippocampal Volume (norm.)",
+  Ventricles:"Ventricular Volume (norm.)", WholeBrain:"Whole Brain Volume (norm.)",
+  Entorhinal:"Entorhinal Volume (norm.)", MidTemp:"Middle Temporal Volume (norm.)",
+};
+const LABEL_ORDER = ["Normal Cognition","Mild Cognitive Impairment","Alzheimer's Disease"];
+const DIMS = [
+  {k:"hallucination",           label:"Hallucination",           short:"Halluc.", type:"binary"},
+  {k:"logic",                   label:"Logic",                   short:"Logic", type:"scale"},
+  {k:"consistency",             label:"Consistency",             short:"Consist.", type:"scale"},
+  {k:"explanation_sufficiency", label:"Explanation Sufficiency", short:"Suff.", type:"scale"},
+];
+const SCALE_DIMS = DIMS.filter(d=>d.type==="scale");
+function binLabel(v){ return v===true?"Present":(v===false?"None":"\u2014"); }
+function rate(arr){ const v=arr.filter(x=>x===true||x===false); return v.length? v.filter(x=>x===true).length/v.length : null; }
+function pct(x){ return x==null?"\u2014":Math.round(x*100)+"%"; }
+/* ====================================================================== */
+
+const MISSING_GROUPS = DATA_SOURCES.map(s=>({key:s.groupKey,name:s.groupName}));
+const GROUP_NAME = {}; MISSING_GROUPS.forEach(g=>GROUP_NAME[g.key]=g.name);
+const $ = id => document.getElementById(id);
+const supa = (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY)
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+let ROWS=[], CASES=[], collapsed={}, selCase=null, timer=null;
+
+function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function avg(a){ const v=a.filter(x=>x!=null); return v.length? v.reduce((x,y)=>x+y,0)/v.length : null; }
+function f2(x){ return x==null?"\u2014":(+x).toFixed(2); }
+function labelOf(c){ return (c && c.label!=null && c.label!=="")?String(c.label):"(no label)"; }
+function isCorrect(c){ const v=c&&c._is_correct; if(v===true||v===1||v==="1")return true; if(typeof v==="string"){const s=v.toLowerCase();return s==="true"||s==="correct"||s==="yes";} return false; }
+function groupKeyOf(c){ const gk=c&&c._group; return GROUP_NAME[gk]!=null?gk:(MISSING_GROUPS[0]?MISSING_GROUPS[0].key:"complete"); }
+function normalizeCases(d){ if(Array.isArray(d))return d; if(d&&typeof d==="object"){const a=Object.values(d).find(v=>Array.isArray(v));return a?a:[d];} return [d]; }
+
+async function loadCases(){
+  const out=[];
+  for(const s of DATA_SOURCES){
+    try{ const r=await fetch(s.url,{cache:"no-store"}); if(!r.ok) continue;
+      normalizeCases(await r.json()).forEach(c=>{ const cc=Object.assign({},c); cc._group=s.groupKey; out.push(cc); });
+    }catch(e){}
+  }
+  return out;   // array index === case_index
+}
+
+// rows visible under the current evaluator filter
+function curEval(){ return $("fEval").value; }
+function evalRows(){ const e=curEval(); return e?ROWS.filter(r=>r.evaluator===e):ROWS; }
+// does this case have a submission under the current filter?
+function caseHasScore(i){ const e=curEval(); return ROWS.some(r=>r.case_index===i && (!e || r.evaluator===e) && r.logic!=null); }
+
+async function fetchAll(){
+  if(!supa){ $("cfgWarn").classList.remove("hidden"); return; }
+  $("msg").textContent="Loading\u2026"; $("msg").className="msg";
+  try{
+    if(!CASES.length) CASES=await loadCases();
+    const { data, error } = await supa.from(SUPABASE_TABLE).select("*");
+    if(error) throw error;
+    const all=data||[]; const withdrawn=all.filter(r=>r.cleared).length;
+    ROWS=all.filter(r=>!r.cleared);
+    $("msg").textContent="Loaded "+ROWS.length+" submissions"+(withdrawn?(" ("+withdrawn+" withdrawn hidden)"):"")+
+      (CASES.length?"":" \u00b7 data files not found, reasoning unavailable")+" \u00b7 "+new Date().toLocaleTimeString();
+    rebuildEvalFilter(); renderNav(); renderMain();
+  }catch(err){ $("msg").textContent="Error: "+(err.message||err); $("msg").className="msg bad"; }
+}
+
+function rebuildEvalFilter(){
+  const cur=$("fEval").value;
+  const evs=[...new Set(ROWS.map(r=>r.evaluator))].sort();
+  $("fEval").innerHTML='<option value="">All evaluators (overview)</option>'+evs.map(e=>'<option>'+esc(e)+'</option>').join("");
+  $("fEval").value=cur;
+}
+
+/* ---- sidebar grouped nav (mirrors evaluation page) ---- */
+function computeGroups(){
+  const n = CASES.length || (ROWS.length?Math.max(...ROWS.map(r=>r.case_index))+1:0);
+  const groups=MISSING_GROUPS.map(mg=>({key:mg.key,name:mg.name,subs:[],total:0,scored:0}));
+  const tmp={}; groups.forEach(g=>tmp[g.key]={});
+  for(let i=0;i<n;i++){
+    const c=CASES[i];
+    const gk=c?groupKeyOf(c):(()=>{const r=ROWS.find(x=>x.case_index===i);return r&&r.group_name===GROUP_NAME.missing?"missing":"complete";})();
+    const lab=c?labelOf(c):((ROWS.find(x=>x.case_index===i)||{}).label||"(no label)");
+    if(!tmp[gk]) continue;
+    (tmp[gk][lab]=tmp[gk][lab]||[]).push(i);
+  }
+  const localId={};
+  groups.forEach(g=>{
+    const present=Object.keys(tmp[g.key]);
+    const ordered=LABEL_ORDER.filter(l=>present.includes(l)).concat(present.filter(l=>!LABEL_ORDER.includes(l)).sort());
+    ordered.forEach(lab=>{
+      const raw=tmp[g.key][lab];
+      const idxs=raw.filter(i=>CASES[i]&&isCorrect(CASES[i])).concat(raw.filter(i=>!(CASES[i]&&isCorrect(CASES[i]))));
+      idxs.forEach((gi,pos)=>localId[gi]=pos);
+      g.subs.push({label:lab,idxs});
+      g.total+=idxs.length; g.scored+=idxs.filter(caseHasScore).length;
+    });
+  });
+  return {groups,localId};
+}
+
+function renderNav(){
+  const {groups,localId}=computeGroups();
+  const anyWrong=CASES.some(c=>!isCorrect(c));
+  let html=anyWrong?'<div class="nav-legend"><span class="leg-swatch"></span>Misclassified (shown last)</div>':"";
+  groups.forEach(g=>{
+    if(!g.total) return;
+    const col=!!collapsed[g.key];
+    html+='<div class="navgroup"><button class="navg-head" data-grp="'+g.key+'">'+
+      '<span class="navg-caret'+(col?" col":"")+'">\u25be</span><span class="navg-name">'+esc(g.name)+'</span>'+
+      '<span class="navg-count">'+g.scored+'/'+g.total+'</span></button>';
+    if(!col){
+      g.subs.forEach(sub=>{
+        if(!sub.idxs.length) return;
+        const wrongN=sub.idxs.filter(i=>CASES[i]&&!isCorrect(CASES[i])).length;
+        html+='<div class="navsub"><div class="navsub-name">'+esc(sub.label)+'<span class="navsub-count">'+sub.idxs.length+
+          (wrongN?' <span class="navsub-wrong">'+wrongN+' misclassified</span>':'')+'</span></div><div class="chips">'+
+          sub.idxs.map(i=>{
+            const wrong=CASES[i]&&!isCorrect(CASES[i]);
+            const cls="chip"+(wrong?" wrong":"")+(i===selCase?" active":"")+(caseHasScore(i)?" has":"");
+            return '<button class="'+cls+'" data-i="'+i+'" title="case #'+i+(caseHasScore(i)?' · scored':' · no score')+'">'+localId[i]+'</button>';
+          }).join("")+'</div></div>';
+      });
+    }
+    html+='</div>';
+  });
+  $("navgroups").innerHTML=html;
+  $("navgroups").querySelectorAll(".chip").forEach(c=>c.addEventListener("click",()=>{ selCase=+c.dataset.i; renderNav(); renderMain(); }));
+  $("navgroups").querySelectorAll(".navg-head").forEach(h=>h.addEventListener("click",()=>{ collapsed[h.dataset.grp]=!collapsed[h.dataset.grp]; renderNav(); }));
+  $("sideHint").textContent = CASES.length? (CASES.length+" cases") : "";
+}
+
+function card(k,v){ return "<div class='card'><div class='k'>"+k+"</div><div class='v'>"+v+"</div></div>"; }
+
+function renderMain(){
+  if(selCase!=null){ renderCase(selCase); return; }
+  // overview — statistics use scored rows only (prediction-only rows excluded)
+  const rows=evalRows().filter(r=>r.logic!=null);
+  const evs=[...new Set(evalRows().map(r=>r.evaluator))];
+  const scaleAvg=avg(rows.flatMap(r=>SCALE_DIMS.map(d=>r[d.k])));
+  const hallAvg=rate(rows.flatMap(r=>DIMS.filter(d=>d.type==="binary").map(d=>r[d.k])));
+  let html='<div class="cards">'+card("Scored",rows.length)+card("Evaluators",evs.length)+
+    card("Avg scale (1-3)",f2(scaleAvg))+card("Hallucination rate",pct(hallAvg))+'</div>';
+  html+='<h2>'+(curEval()?esc(curEval())+" — by case":"By evaluator")+'</h2>';
+  if(curEval()){
+    const all=evalRows().sort((a,b)=>a.case_index-b.case_index);
+    html+='<div class="wrap"><table><thead><tr><th class="num">Case</th><th>True label</th><th>Predicted</th><th>Model</th>'+
+      DIMS.map(d=>'<th class="num">'+d.short+'</th>').join("")+'<th>Comment</th></tr></thead><tbody>'+
+      all.map(r=>{const corr=r.is_correct===false?"<span class='tag wrong'>wrong</span>":(r.is_correct===true?"<span class='tag ok'>correct</span>":"");
+        const predMatch=r.doctor_prediction!=null && r.label!=null ? (r.doctor_prediction===r.label?" tag ok":" tag wrong"):"";
+        const pred=r.doctor_prediction!=null?"<span class='"+(predMatch.trim())+"'>"+esc(r.doctor_prediction)+"</span>":"\u2014";
+        return "<tr><td class='num'>"+r.case_index+"</td><td>"+esc(r.label)+"</td><td>"+pred+"</td><td>"+corr+"</td>"+
+        DIMS.map(d=>"<td class='num'>"+(r.logic==null?"\u2014":(d.type==="binary"?binLabel(r[d.k]):esc(r[d.k])))+"</td>").join("")+
+        "<td>"+esc(r.comment||"")+"</td></tr>";}).join("")+
+      '</tbody></table></div><div class="muted" style="margin-top:10px;font-size:12.5px;">Pick a case on the left to see its reasoning and this evaluator\'s scoring.</div>';
+  }else{
+    html+='<div class="wrap"><table><thead><tr><th>Evaluator</th><th class="num">Scored</th>'+
+      DIMS.map(d=>'<th class="num">'+(d.type==="binary"?d.short+" %":"Avg "+d.short)+'</th>').join("")+'</tr></thead><tbody>'+
+      evs.sort().map(ev=>{const rs=rows.filter(r=>r.evaluator===ev);
+        return "<tr><td>"+esc(ev)+"</td><td class='num'>"+rs.length+"</td>"+
+          DIMS.map(d=>"<td class='num'>"+(d.type==="binary"?pct(rate(rs.map(r=>r[d.k]))):f2(avg(rs.map(r=>r[d.k]))))+"</td>").join("")+
+          "</td></tr>";}).join("")+
+      '</tbody></table></div><div class="muted" style="margin-top:10px;font-size:12.5px;">Pick an evaluator above, then a case on the left.</div>';
+  }
+  $("main").innerHTML=html;
+}
+
+function renderCase(i){
+  const c=CASES[i];
+  const e=curEval();
+  const myRows=ROWS.filter(r=>r.case_index===i && (!e || r.evaluator===e));
+  const any=myRows[0]||ROWS.find(r=>r.case_index===i)||{};
+  const lab=c?labelOf(c):(any.label||"");
+  const grp=c?GROUP_NAME[groupKeyOf(c)]:(any.group_name||"");
+  const corr=c?isCorrect(c):any.is_correct;
+  const corrTag=corr===false?"<span class='tag wrong'>model wrong</span>":(corr===true?"<span class='tag ok'>model correct</span>":"");
+
+  let fgrid;
+  if(c&&c.features&&typeof c.features==="object"){
+    fgrid='<div class="fgrid">'+Object.entries(c.features).map(([k,v])=>
+      '<div class="cell"><span class="mk">'+esc(FEATURE_LABELS[k]||k)+'</span><span class="mv">'+(v==null?"\u2014":esc(v))+'</span></div>').join("")+'</div>';
+  } else fgrid='<div class="muted" style="font-size:13px;">Features unavailable (data file not loaded).</div>';
+  const reasoning=c?(c.rationale!=null?String(c.rationale):"(no rationale field in data)"):"(data file not loaded — reasoning unavailable)";
+
+  let scoreHtml;
+  if(!e){
+    scoreHtml='<div class="notice">Select an evaluator above to see their prediction and scoring for this case. ('+myRows.length+' evaluation'+(myRows.length===1?'':'s')+' total)</div>';
+  }else if(!myRows.length){
+    scoreHtml='<div class="notice"><b>'+esc(e)+'</b> has not started this case.</div>';
+  }else{
+    const r=myRows[0];
+    const predMatch = r.doctor_prediction!=null && lab!=null && lab!=="(no label)" ? (r.doctor_prediction===lab) : null;
+    const predTag = r.doctor_prediction==null ? '<span class="muted">not predicted</span>'
+      : '<span class="tag '+(predMatch===true?"ok":(predMatch===false?"wrong":""))+'">'+esc(r.doctor_prediction)+(predMatch===true?" \u2713":(predMatch===false?" \u2717":""))+'</span>';
+    const predLine='<div class="predrow"><span class="rtitle" style="margin:0;">Evaluator\'s prediction</span>'+predTag+
+      '<span class="muted" style="font-size:12px;">true label: '+esc(lab)+'</span></div>';
+    const scored = r.logic!=null;
+    scoreHtml=predLine + (scored
+      ? '<div class="scorebox">'+DIMS.map(d=>'<div class="scell"><div class="sk">'+d.label+'</div><div class="sv">'+(d.type==="binary"?binLabel(r[d.k]):esc(r[d.k]))+'</div></div>').join("")+'</div>'+
+        (r.comment?'<div class="cmtbox"><div class="rtitle">Comment</div>'+esc(r.comment)+'</div>':'')+
+        '<div class="muted" style="margin-top:10px;font-size:12px;">Submitted '+esc((r.updated_at||"").replace("T"," ").slice(0,16))+'</div>'
+      : '<div class="notice" style="margin-top:12px;">Predicted, but not yet scored.</div>');
+  }
+
+  $("main").innerHTML=
+    '<div class="casebox"><div class="case-head"><span class="case-id">#'+i+(any.case_id?'  \u00b7  id '+esc(any.case_id):'')+'</span>'+
+      '<span class="case-label">'+esc(lab)+'</span><span class="tag">'+esc(grp)+'</span>'+corrTag+'</div>'+
+      '<div class="case-cols"><div>'+fgrid+'</div><div><div class="rtitle">Reasoning</div><div class="reasoning">'+esc(reasoning)+'</div></div></div>'+
+    '</div>'+
+    '<h2>'+(e?esc(e)+"'s scoring":"Scoring")+'</h2>'+scoreHtml;
+}
+
+function downloadCSV(){
+  const cols=["evaluator","case_index","case_id","group_name","label","is_correct","doctor_prediction","hallucination","logic","consistency","explanation_sufficiency","comment","updated_at"];
+  const rows=evalRows();
+  const lines=[cols.join(",")];
+  rows.forEach(r=>lines.push(cols.map(c=>{const v=r[c]==null?"":String(r[c]).replace(/"/g,'""');return /[",\n]/.test(v)?'"'+v+'"':v;}).join(",")));
+  const blob=new Blob([lines.join("\n")],{type:"text/csv"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download="evaluations_"+new Date().toISOString().slice(0,10)+".csv"; a.click();
+}
+
+$("fEval").addEventListener("change",()=>{ renderNav(); renderMain(); });
+$("refresh").addEventListener("click",fetchAll);
+$("csv").addEventListener("click",downloadCSV);
+$("auto").addEventListener("change",e=>{ if(e.target.checked){timer=setInterval(fetchAll,15000);} else {clearInterval(timer);} });
+
+fetchAll();
+</script>
+</body>
+</html>
