@@ -299,7 +299,7 @@ Or select the data file(s) manually below &darr;
     <section class="content" id="content"></section>
     <aside class="panel">
       <div class="panel-htop"><div class="panel-h" id="panelH">Score</div><span id="doneFlag"></span></div>
-      <div class="panel-sub" id="panelSub">Hallucinations: None / Present &middot; Scales: 1 = Poor, 5 = Excellent</div>
+      <div class="panel-sub" id="panelSub">Hallucination: None / Present &middot; Scales: 1 = lowest, 3 = highest</div>
       <div id="dims"></div>
       <div class="dim" id="commentBlock">
         <div class="dim-top"><span class="dim-name">Comments</span><span class="dim-en">Optional</span></div>
@@ -334,8 +334,8 @@ const DATA_SOURCES = [
    Find them in Supabase: Project Settings → API.
    Leave them empty to run offline (Submit will be disabled).
    ============================================================ */
-const SUPABASE_URL      = "";   // e.g. "https://abcdefgh.supabase.co"
-const SUPABASE_ANON_KEY = "";   // the long "anon public" key
+const SUPABASE_URL      = "https://nndkbviqczxqxqgncggd.supabase.co";   // e.g. "https://abcdefgh.supabase.co"
+const SUPABASE_ANON_KEY = "sb_publishable_cm4fMIaM-TfjTclOJIbMGw_SPzSKVeZ";   // the long "anon public" key
 const SUPABASE_TABLE    = "evaluations";
 /* ▲▲▲  END OF SETTING  ▲▲▲ */
 const DIMENSIONS = [
@@ -343,9 +343,8 @@ const DIMENSIONS = [
   { key:"logic",                    label:"Logic",                    desc:"Are the reasoning steps coherent and causally sound?", type:"scale", tone:"teal" },
   { key:"consistency",              label:"Consistency",              desc:"Are the reasoning's statements consistent with each other and with the conclusion?", type:"scale", tone:"teal" },
   { key:"explanation_sufficiency",  label:"Explanation Sufficiency",  desc:"Is the explanation complete enough to justify the conclusion?", type:"scale", tone:"teal" },
-  { key:"explanation_necessity",    label:"Explanation Necessity",    desc:"Is everything in the explanation necessary (no irrelevant padding)?", type:"scale", tone:"teal" },
 ];
-const SCALE = [1,2,3,4,5];
+const SCALE = [1,2,3];
 const DEFAULT_FIELDS = ["features","label","rationale"];
 const FIELD_ORDER = ["id","idx","features","question","note","label","prediction","rationale","decision_path"];
 const REASON_HINTS = ["reason","rationale","thinking","thought","cot","chain"];
@@ -382,7 +381,7 @@ const LS_KEY = "reasoning_eval_state_v4_sourcegroups";
 
 // ── State ──
 let cases = null, fileName = "", idx = 0;
-let evals = {};            // { i: {hallucination, logic, consistency, explanation_sufficiency, explanation_necessity, comment} }
+let evals = {};            // { i: {hallucination, logic, consistency, explanation_sufficiency, comment} }
 let savedSnapshot = {};    // { i: canonical string of what is currently saved in the DB }
 let dbRows = {};           // { i: true } when a row for this case exists in the DB (predicted or scored)
 let evaluatorName = "";    // logged-in evaluator
@@ -558,7 +557,7 @@ function renderPanel(){
 
   // Step 2 — prediction locked, score the reasoning
   els.panelH.textContent = "Step 2 · Score";
-  els.panelSub.textContent = "Hallucination: None / Present \u00b7 Scales: 1 = Poor, 5 = Excellent";
+  els.panelSub.textContent = "Hallucination: None / Present \u00b7 Scales: 1 = lowest, 3 = highest";
   const banner = '<div class="pred-banner">Your prediction: <b>'+esc(e.doctor_prediction)+'</b><span class="pred-lock">locked</span></div>';
   els.dims.innerHTML = banner + DIMENSIONS.map(d=>{
     if(d.type==="binary"){
@@ -569,8 +568,7 @@ function renderPanel(){
     }
     const dots = SCALE.map(n=>'<button class="dot'+(e[d.key]===n?" sel":"")+'" data-dim="'+d.key+'" data-val="'+n+'">'+n+'</button>').join("");
     return '<div class="dim '+(d.tone||"teal")+'"><div class="dim-top"><span class="dim-name">'+d.label+'</span></div>'+
-      '<div class="dim-desc">'+d.desc+'</div><div class="scale">'+dots+'</div>'+
-      '<div class="anchors"><span>Poor</span><span>Excellent</span></div></div>';
+      '<div class="dim-desc">'+d.desc+'</div><div class="scale">'+dots+'</div></div>';
   }).join("");
   els.dims.querySelectorAll(".dot").forEach(btn=>btn.addEventListener("click",()=>{
     evals[idx]=Object.assign({}, evals[idx], {[btn.dataset.dim]:+btn.dataset.val});
@@ -616,7 +614,6 @@ function rowFor(i){
     logic: e.logic!=null ? e.logic : null,
     consistency: e.consistency!=null ? e.consistency : null,
     explanation_sufficiency: e.explanation_sufficiency!=null ? e.explanation_sufficiency : null,
-    explanation_necessity: e.explanation_necessity!=null ? e.explanation_necessity : null,
     comment: e.comment || "",
     cleared: false,
     updated_at: new Date().toISOString(),
@@ -666,7 +663,7 @@ async function clearInDb(indices){
       case_id: (c && (c.id!=null?String(c.id):(c.idx!=null?String(c.idx):null))),
       group_name: GROUP_NAME[groupKeyOf(c)] || null, label: labelOf(c), is_correct: isCorrect(c),
       doctor_prediction: pred,   // prediction is locked: it stays
-      hallucination: null, logic: null, consistency: null, explanation_sufficiency: null, explanation_necessity: null, comment: "",
+      hallucination: null, logic: null, consistency: null, explanation_sufficiency: null, comment: "",
       cleared: (pred==null),     // only fully withdraw if there was no prediction to keep
       updated_at: new Date().toISOString(),
     };
@@ -695,7 +692,6 @@ async function loadEvaluatorRows(){
         logic: r.logic,
         consistency: r.consistency,
         explanation_sufficiency: r.explanation_sufficiency,
-        explanation_necessity: r.explanation_necessity,
         comment: r.comment||""
       };
       if(fullyScored(evals[i])) savedSnapshot[i] = snapshotOf(i);
