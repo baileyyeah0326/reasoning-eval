@@ -262,7 +262,7 @@ header{
 <!-- Fallback UI when auto-load fails -->
 <div id="emptyState" class="empty-state hidden">
   <h2 class="serif">Could not load data automatically</h2>
-  <p class="lead" id="emptyMsg">The page failed to load the data file (<span class="mono" id="dataUrlLabel">data_subset.json</span>) automatically.<br>This usually happens when the file is opened by double-clicking &mdash; browsers block local pages from reading local files.</p>
+  <p class="lead" id="emptyMsg">The page failed to load the data file (<span class="mono" id="dataUrlLabel">data_physician50.json</span>) automatically.<br>This usually happens when the file is opened by double-clicking &mdash; browsers block local pages from reading local files.</p>
   <div class="fmt" style="text-align:left;white-space:pre-wrap;">How to fix (either option):
 1) Host this file and the two data files on a server / intranet / static hosting;
 2) In the data folder, run:  python -m http.server
@@ -324,8 +324,11 @@ Or select the data file(s) manually below &darr;
    cannot auto-load and falls back to manual selection.
    ============================================================ */
 const DATA_SOURCES = [
-  { url: "./data_subset.json",  groupKey: "missing",  groupName: "Selected subset" },
+  { url: "./data_physician50.json",  groupKey: "missing",  groupName: "Physician eval 50 (SFT ckpt 10250)" },
 ];
+// DB rows store case_index = local index + CASE_INDEX_OFFSET so this case set never collides with rows
+// saved for an earlier case set (old rows use 0..N). Change the offset whenever the case set changes.
+const CASE_INDEX_OFFSET = 1000;
 /* ▲▲▲  END OF SETTING  ▲▲▲ */
 
 /* ============================================================
@@ -374,10 +377,10 @@ const FEATURE_LABELS = {
 // Level 1: the source file each case came from (tagged at load via _group).
 // Level 2: the case label. Edit/reorder LABEL_ORDER as needed; any label not
 // listed here is shown after these, under its own section.
-const LABEL_ORDER = ["Normal Cognition", "Mild Cognitive Impairment", "Alzheimer's Disease"];
+const LABEL_ORDER = ["Normal Cognition", "Mild Cognitive Impairment", "Dementia"];
 const MISSING_GROUPS = DATA_SOURCES.map(s=>({ key: s.groupKey, name: s.groupName }));
 const GROUP_NAME = {}; MISSING_GROUPS.forEach(g=>{ GROUP_NAME[g.key]=g.name; });
-const LS_KEY = "reasoning_eval_state_v4_sourcegroups";
+const LS_KEY = "reasoning_eval_state_v5_physician50";
 
 // ── State ──
 let cases = null, fileName = "", idx = 0;
@@ -604,7 +607,7 @@ function rowFor(i){
   const c = cases[i], e = evals[i];
   return {
     evaluator: evaluatorName,
-    case_index: i,
+    case_index: i + CASE_INDEX_OFFSET,
     case_id: (c && (c.id!=null?String(c.id):(c.idx!=null?String(c.idx):null))),
     group_name: GROUP_NAME[groupKeyOf(c)] || null,
     label: labelOf(c),
@@ -659,7 +662,7 @@ async function clearInDb(indices){
     const c = cases[i];
     const pred = (evals[i] && evals[i].doctor_prediction!=null) ? evals[i].doctor_prediction : null;
     return {
-      evaluator: evaluatorName, case_index: i,
+      evaluator: evaluatorName, case_index: i + CASE_INDEX_OFFSET,
       case_id: (c && (c.id!=null?String(c.id):(c.idx!=null?String(c.idx):null))),
       group_name: GROUP_NAME[groupKeyOf(c)] || null, label: labelOf(c), is_correct: isCorrect(c),
       doctor_prediction: pred,   // prediction is locked: it stays
@@ -682,7 +685,7 @@ async function loadEvaluatorRows(){
     const { data, error } = await supa.from(SUPABASE_TABLE).select("*").eq("evaluator", evaluatorName);
     if(error) throw error;
     (data||[]).forEach(r=>{
-      const i = r.case_index;
+      const i = r.case_index - CASE_INDEX_OFFSET;
       if(i==null || i<0 || !cases || i>=cases.length) return;
       if(r.cleared) return;   // cleared rows count as un-scored
       dbRows[i] = true;
