@@ -215,6 +215,8 @@ header{
 .submit-msg{font-size:12px;margin-top:8px;min-height:15px;color:var(--ink2);}
 .submit-msg.ok{color:var(--teal-d);}
 .submit-msg.bad{color:var(--rose);}
+.save-next{width:100%;justify-content:center;height:44px;font-size:14px;margin-top:4px;}
+.save-next:disabled{opacity:.45;cursor:not-allowed;box-shadow:none;}
 .clear-one{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;margin-top:14px;background:none;border:none;color:var(--ink3);font-family:inherit;font-size:12.5px;cursor:pointer;padding:6px;}
 .clear-one:hover:not(:disabled){color:var(--rose);}
 .clear-one:disabled{opacity:.4;cursor:not-allowed;}
@@ -305,6 +307,7 @@ Or select the data file(s) manually below &darr;
         <div class="dim-top"><span class="dim-name">Comments</span><span class="dim-en">Optional</span></div>
         <textarea class="comment" id="comment" placeholder="Note key issues, strengths, or suggestions..."></textarea>
       </div>
+      <button id="btnSaveNext" class="btn btn-primary save-next">Next case &rarr;</button>
       <button id="btnClearOne" class="clear-one" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Clear this case's score</button>
     </aside>
   </div>
@@ -404,7 +407,7 @@ const els = {
   emptyState:$("emptyState"), loaded:$("loaded"), drop:$("drop"), fileInput:$("fileInput"),
   emptyMsg:$("emptyMsg"), dataUrlLabel:$("dataUrlLabel"),
   topctrl:$("topctrl"), whoami:$("whoami"), btnSignout:$("btnSignout"), progbar:$("progbar"), pcount:$("pcount"),
-  btnClearOne:$("btnClearOne"), btnClearAll:$("btnClearAll"), err:$("err"), errmsg:$("errmsg"),
+  btnClearOne:$("btnClearOne"), btnSaveNext:$("btnSaveNext"), btnClearAll:$("btnClearAll"), err:$("err"), errmsg:$("errmsg"),
   prevBtn:$("prevBtn"), nextBtn:$("nextBtn"), caseCount:$("caseCount"), crumb:$("crumb"), navgroups:$("navgroups"),
   sidebar:$("sidebar"), sideCollapse:$("sideCollapse"),
   content:$("content"), dims:$("dims"), comment:$("comment"),
@@ -543,6 +546,8 @@ function renderPanel(){
 
   els.commentBlock.style.display = predicted ? "" : "none";
   els.btnClearOne.style.display = predicted ? "" : "none";
+  els.btnSaveNext.style.display = predicted ? "" : "none";
+  renderSaveNext();
 
   if(!predicted){
     // Step 1 — predict from features only
@@ -575,11 +580,11 @@ function renderPanel(){
   }).join("");
   els.dims.querySelectorAll(".dot").forEach(btn=>btn.addEventListener("click",()=>{
     evals[idx]=Object.assign({}, evals[idx], {[btn.dataset.dim]:+btn.dataset.val});
-    renderPanel(); renderNav(); updateProgress(); saveState();
+    renderPanel(); renderNav(); updateProgress(); saveState(); scheduleSave(0);
   }));
   els.dims.querySelectorAll(".bin-btn").forEach(btn=>btn.addEventListener("click",()=>{
     evals[idx]=Object.assign({}, evals[idx], {[btn.dataset.dim]:(btn.dataset.bin==="1")});
-    renderPanel(); renderNav(); updateProgress(); saveState();
+    renderPanel(); renderNav(); updateProgress(); saveState(); scheduleSave(0);
   }));
   els.comment.value = e.comment || "";
   els.doneFlag.innerHTML = fullyScored(e) ? '<span class="done-flag">'+CHECKCIRC+' Done</span>' : "";
@@ -636,22 +641,48 @@ function renderSubmitButton(){
 }
 
 // Submit ALL pending (fully-scored, changed) cases in one batch
-async function submitAll(){
-  if(!supa) return;
+async function submitAll(){ return flushSaves(); }
+
+// ── Auto-save: a case is written to the DB as soon as all its scores are filled in, and again after
+// every later edit (scores immediately, comments after a short pause). Submit stays as a manual retry.
+let saving = false, saveAgain = false, saveTimer = null;
+function scheduleSave(delay){ clearTimeout(saveTimer); saveTimer = setTimeout(flushSaves, delay||0); }
+async function flushSaves(){
+  clearTimeout(saveTimer); saveTimer = null;
+  if(saving){ saveAgain = true; return; }
   const idxs = pendingIndices();
-  if(!idxs.length) return;
+  if(!supa || !idxs.length) return true;
+  saving = true;
+  const ok = await submitIndices(idxs);
+  saving = false;
+  if(saveAgain){ saveAgain = false; return flushSaves(); }
+  return ok;
+}
+// first case (in display order) that this evaluator has not fully scored
+function firstUnfinished(){
+  const i = orderSeq.find(j=>!fullyScored(evals[j]));
+  return i!=null ? i : (orderSeq.length ? orderSeq[0] : 0);
+}
+
+// Upsert the given cases; returns true on success
+async function submitIndices(idxs){
+  if(!supa || !idxs.length) return !idxs.length;
   els.btnSubmit.dataset.busy = "1"; renderSubmitButton();
   try{
     const rows = idxs.map(rowFor);
+    const snaps = idxs.map(snapshotOf);   // taken before the request: edits made while it is in flight stay pending
     const { error } = await supa.from(SUPABASE_TABLE).upsert(rows, { onConflict: "evaluator,case_index" });
     els.btnSubmit.dataset.busy = "0";
     if(error) throw error;
-    idxs.forEach(i=>{ savedSnapshot[i] = snapshotOf(i); dbRows[i]=true; });
+    idxs.forEach((i,k)=>{ savedSnapshot[i] = snaps[k]; dbRows[i]=true; });
+    hideErr();
     renderSubmitButton(); renderNav(); updateProgress();
+    return true;
   }catch(err){
     els.btnSubmit.dataset.busy = "0";
     renderSubmitButton();
-    showErr("Submit failed: " + (err.message || err) + " — please try again.");
+    showErr("Could not save to the database: " + (err.message || err) + " — your scores are kept on this page; click Submit to retry.");
+    return false;
   }
 }
 
@@ -783,9 +814,11 @@ function updateProgress(){
   els.btnClearAll.disabled = !anyData() && submittedCount()===0 && Object.keys(dbRows).length===0;
   els.btnClearOne.disabled = !caseHasData(idx) && !hadDbRow(idx);
   renderSubmitButton();
+  renderSaveNext();
 }
 
 function goTo(i){
+  if(saveTimer) flushSaves();   // a comment edit is still waiting to be saved
   idx = Math.max(0, Math.min(cases.length-1, i));
   predPick = null;   // discard any unconfirmed step-1 pick when moving cases
   renderContent(); renderPanel(); renderNav(); updateProgress(); saveState();
@@ -809,7 +842,18 @@ function applyCases(list, fname){
 function showErr(m){ els.errmsg.textContent=m; els.err.classList.remove("hidden"); }
 function hideErr(){ els.err.classList.add("hidden"); }
 
+// "Next case" button in the scoring panel: navigation only — nothing is written to the database
+// until the evaluator clicks Submit.
+function renderSaveNext(){
+  const b = els.btnSaveNext; if(!b || !cases) return;
+  const last = orderSeq.indexOf(idx) >= orderSeq.length-1;
+  b.disabled = last;
+  b.textContent = last ? "Last case" : "Next case \u2192";
+}
+function saveAndNext(){ stepNav(1); }
+
 // ── Event bindings ──
+els.btnSaveNext.addEventListener("click",saveAndNext);
 els.prevBtn.addEventListener("click",()=>stepNav(-1));
 els.nextBtn.addEventListener("click",()=>stepNav(1));
 els.sideCollapse.addEventListener("click",toggleSidebar);
@@ -834,7 +878,7 @@ els.btnClearAll.addEventListener("click",()=>{
   if(orderSeq.length) idx = orderSeq[0];
   renderContent(); renderPanel(); renderNav(); updateProgress(); saveState();
 });
-els.comment.addEventListener("input",()=>{ evals[idx]=Object.assign({}, evals[idx], {comment:els.comment.value}); updateProgress(); saveState(); });
+els.comment.addEventListener("input",()=>{ evals[idx]=Object.assign({}, evals[idx], {comment:els.comment.value}); updateProgress(); saveState(); scheduleSave(1000); });
 els.btnSubmit.addEventListener("click",submitAll);
 window.addEventListener("beforeunload",e=>{
   if(cases && pendingIndices().length>0){ e.preventDefault(); e.returnValue = ""; }
@@ -889,7 +933,7 @@ function ingestFiles(fileList){
 async function enterWith(merged){
   applyCases(merged, "data");
   await loadEvaluatorRows();
-  if(orderSeq.length) idx = orderSeq.indexOf(idx)>=0 ? idx : orderSeq[0];
+  idx = firstUnfinished();   // resume where this evaluator left off
   renderContent(); renderPanel(); renderNav(); updateProgress();
 }
 els.fileInput.addEventListener("change",e=>{ ingestFiles(e.target.files); e.target.value=""; });
