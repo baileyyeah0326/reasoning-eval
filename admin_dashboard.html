@@ -121,6 +121,7 @@ tr:last-child td{border-bottom:none;}
       <select id="fEval"><option value="">All evaluators (overview)</option></select></div>
     <button class="btn primary" id="refresh">Refresh</button>
     <button class="btn" id="csv">Download CSV</button>
+    <label class="btn" title="Local file ~/DisCO/diag/physician_eval/single100_mapping.json; read in the browser only, never uploaded">Load model mapping<input type="file" id="mapfile" accept=".json" hidden></label>
     <label class="btn" style="cursor:default;">Auto-refresh<input type="checkbox" id="auto" style="margin-left:6px;" /></label>
     <span class="msg" id="msg"></span>
   </div>
@@ -141,9 +142,9 @@ const SUPABASE_URL      = "https://nndkbviqczxqxqgncggd.supabase.co";   // e.g. 
 const SUPABASE_ANON_KEY = "sb_publishable_cm4fMIaM-TfjTclOJIbMGw_SPzSKVeZ";   // the long "anon public" key
 const SUPABASE_TABLE    = "evaluations";
 const DATA_SOURCES = [
-  { url: "./data_physician50.json",  groupKey: "missing",  groupName: "Physician eval 50 (SFT ckpt 10250)" },
+  { url: "./data_single100.json",  groupKey: "single100",  groupName: "Blind eval 100 (50 patients x 2 reasonings)" },
 ];
-const CASE_INDEX_OFFSET = 1000;   // must match the evaluation page; rows of earlier case sets are ignored
+const CASE_INDEX_OFFSET = 4000;   // must match the evaluation page; rows of earlier case sets are ignored
 const FEATURE_LABELS = {
   PTGENDER:"Sex", PTEDUCAT:"Education (years)", APOE4:"APOE \u03b54 alleles", AGE:"Age (years)",
   CDRSB:"CDR-SB", ADAS11:"ADAS-Cog 11", ADAS13:"ADAS-Cog 13", MMSE:"MMSE",
@@ -180,6 +181,11 @@ const supa = (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY)
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
 let ROWS=[], CASES=[], collapsed={}, selCase=null, timer=null;
+// page -> {case, system}; loaded from a local file only (the site itself stays blinded)
+let MAPPING=null;
+function sysOfIdx(i){ const c=CASES[i]; return MAPPING && c && MAPPING[c.id] ? MAPPING[c.id].system : null; }
+function patientOf(i){ const c=CASES[i]; return (c && c._case) || ""; }
+function systems(){ return MAPPING ? [...new Set(Object.values(MAPPING).map(m=>m.system))].sort() : []; }
 
 function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 function avg(a){ const v=a.filter(x=>x!=null); return v.length? v.reduce((x,y)=>x+y,0)/v.length : null; }
@@ -220,7 +226,7 @@ async function fetchAll(){
     if(error) throw error;
     const all=(data||[]).filter(r=>r.case_index>=CASE_INDEX_OFFSET && r.case_index<CASE_INDEX_OFFSET+(CASES.length||Infinity))
       .map(r=>{ const i=r.case_index-CASE_INDEX_OFFSET;
-        return Object.assign({},r,{case_index:i, case_id:caseIdOf(i), test_set:testSetOf(CASES[i])}); });
+        return Object.assign({},r,{case_index:i, case_id:caseIdOf(i), test_set:testSetOf(CASES[i]), patient:patientOf(i), system:sysOfIdx(i)}); });
     const withdrawn=all.filter(r=>r.cleared).length;
     ROWS=all.filter(r=>!r.cleared);
     $("msg").textContent="Loaded "+ROWS.length+" submissions"+(withdrawn?(" ("+withdrawn+" withdrawn hidden)"):"")+
@@ -337,6 +343,26 @@ function agreementHtml(){
   return html+'</tbody></table></div><div class="muted" style="margin-top:8px;font-size:12px;">κ is undefined (—) when a pair of raters used a single category for every shared case; with mostly high scores κ can be low even when % agreement is high.</div>';
 }
 
+// same evaluator, same patient, both pages scored: which model got the better score per dimension
+function pairedHtml(){
+  const sys=systems(); if(sys.length!==2) return "";
+  const by={};
+  evalRows().filter(r=>r.logic!=null).forEach(r=>{ ((by[r.evaluator]=by[r.evaluator]||{})[r.patient]=by[r.evaluator][r.patient]||{})[r.system]=r; });
+  const pairs=[]; Object.values(by).forEach(o=>Object.values(o).forEach(p=>{ if(p[sys[0]]&&p[sys[1]]) pairs.push([p[sys[0]],p[sys[1]]]); }));
+  let html='<h2>Paired by patient ('+pairs.length+' evaluator × patient pairs)</h2><div class="wrap"><table><thead><tr><th>Dimension</th><th class="num">'+esc(sys[0])+' better</th><th class="num">Equal</th><th class="num">'+esc(sys[1])+' better</th><th class="num">Mean diff ('+esc(sys[0])+' − '+esc(sys[1])+')</th></tr></thead><tbody>';
+  DIMS.forEach(d=>{
+    let w0=0,eq=0,w1=0; const df=[];
+    pairs.forEach(([a,b])=>{
+      let x=a[d.k], y=b[d.k];
+      if(d.type==="binary"){ x=x?1:0; y=y?1:0; df.push(x-y); x=-x; y=-y; }   // no hallucination is better
+      else df.push(x-y);
+      if(x>y) w0++; else if(y>x) w1++; else eq++;
+    });
+    html+="<tr><td>"+esc(d.label)+(d.type==="binary"?" <span class='muted'>(diff = rate difference)</span>":"")+"</td><td class='num'>"+w0+"</td><td class='num'>"+eq+"</td><td class='num'>"+w1+"</td><td class='num'>"+f2(avg(df))+"</td></tr>";
+  });
+  return html+'</tbody></table></div>';
+}
+
 function renderMain(){
   if(selCase!=null){ renderCase(selCase); return; }
   // statistics use scored rows only (prediction-only rows excluded), except doctor accuracy which uses every prediction
@@ -352,12 +378,12 @@ function renderMain(){
     card("Avg all scales (1-3)",f2(scaleAvg))+'</div>';
   if(curEval()){
     const list=all.slice().sort((a,b)=>caseIdOf(a.case_index).localeCompare(caseIdOf(b.case_index)));
-    html+='<h2>'+esc(curEval())+' — by case</h2><div class="wrap"><table><thead><tr><th>Case</th><th>Test set</th><th>True label</th><th>Predicted</th>'+
+    html+='<h2>'+esc(curEval())+' — by case</h2><div class="wrap"><table><thead><tr><th>Case</th><th>Patient</th>'+(MAPPING?'<th>Model</th>':'')+'<th>Test set</th><th>True label</th><th>Predicted</th>'+
       DIMS.map(d=>'<th class="num">'+d.short+'</th>').join("")+'<th>Comment</th><th>Updated</th></tr></thead><tbody>'+
       list.map(r=>{
         const predMatch=r.doctor_prediction!=null ? (r.doctor_prediction===r.label?"tag ok":"tag wrong") : "";
         const pred=r.doctor_prediction!=null?"<span class='"+predMatch+"'>"+esc(r.doctor_prediction)+"</span>":"—";
-        return "<tr class='rowlink' data-i='"+r.case_index+"'><td class='mono'>"+esc(r.case_id)+"</td><td>"+esc(tsName(r.test_set))+"</td><td>"+esc(r.label)+"</td><td>"+pred+"</td>"+
+        return "<tr class='rowlink' data-i='"+r.case_index+"'><td class='mono'>"+esc(r.case_id)+"</td><td class='mono'>"+esc(r.patient)+"</td>"+(MAPPING?"<td>"+esc(r.system)+"</td>":"")+"<td>"+esc(tsName(r.test_set))+"</td><td>"+esc(r.label)+"</td><td>"+pred+"</td>"+
           DIMS.map(d=>"<td class='num'>"+(r.logic==null?"—":(d.type==="binary"?binLabel(r[d.k]):esc(r[d.k])))+"</td>").join("")+
           "<td>"+esc(r.comment||"")+"</td><td class='mono' style='white-space:nowrap;'>"+esc(fmtTime(r.updated_at))+"</td></tr>";
       }).join("")+'</tbody></table></div>';
@@ -371,6 +397,7 @@ function renderMain(){
           "<td class='num'>"+pct(accOf(mine))+"</td>"+dimCells(rs)+"<td class='mono' style='white-space:nowrap;'>"+esc(fmtTime(last))+"</td></tr>";
       }).join("")+'</tbody></table></div>';
   }
+  if(MAPPING){ html+=breakdown("By model", r=>r.system, systems(), k=>k); html+=pairedHtml(); }
   const tsKeys=TEST_SETS.map(t=>t.key).filter(k=>CASES.some(c=>testSetOf(c)===k));
   html+=breakdown("By test set", r=>r.test_set, tsKeys, tsName);
   html+=breakdown("By true label", r=>r.label, LABEL_ORDER, k=>k);
@@ -413,7 +440,7 @@ function renderCase(i){
   $("main").innerHTML=
     '<button class="btn back-btn" id="backBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>Back to overview</button>'+
     '<div class="casebox"><div class="case-head"><span class="case-id">'+esc(caseIdOf(i))+'</span>'+
-      '<span class="case-label">'+esc(lab)+'</span><span class="tag">'+esc(grp)+'</span><span class="muted" style="font-size:12px;">missing: '+esc(miss)+'</span></div>'+
+      '<span class="case-label">'+esc(lab)+'</span><span class="tag">'+esc(grp)+'</span><span class="tag">patient '+esc(patientOf(i))+'</span>'+(sysOfIdx(i)?'<span class="tag">'+esc(sysOfIdx(i))+'</span>':'')+'<span class="muted" style="font-size:12px;">missing: '+esc(miss)+'</span></div>'+
       '<div class="case-cols"><div>'+fgrid+'</div><div><div class="rtitle">Reasoning</div><div class="reasoning">'+esc(reasoning)+'</div></div></div>'+
     '</div>'+
     '<h2>'+(e?esc(e)+"'s scoring":"All evaluators' scoring ("+myRows.length+")")+'</h2>'+scoreHtml;
@@ -421,7 +448,7 @@ function renderCase(i){
 }
 
 function downloadCSV(){
-  const cols=["evaluator","case_id","test_set","label","doctor_prediction","hallucination","logic","consistency","explanation_sufficiency","comment","updated_at","case_index"];
+  const cols=["evaluator","case_id","patient","system","test_set","label","doctor_prediction","hallucination","logic","consistency","explanation_sufficiency","comment","updated_at","case_index"];
   const rows=evalRows();
   const lines=[cols.join(",")];
   rows.forEach(r=>lines.push(cols.map(c=>{const v=r[c]==null?"":String(r[c]).replace(/"/g,'""');return /[",\n]/.test(v)?'"'+v+'"':v;}).join(",")));
@@ -431,6 +458,14 @@ function downloadCSV(){
 }
 
 $("fEval").addEventListener("change",()=>{ renderNav(); renderMain(); });
+$("mapfile").addEventListener("change",async ev=>{
+  try{
+    const j=JSON.parse(await ev.target.files[0].text()); MAPPING=j.mapping||j;
+    ROWS.forEach(r=>{ r.system=sysOfIdx(r.case_index); });
+    $("msg").textContent="Model mapping loaded: "+systems().join(" vs "); $("msg").className="msg";
+    renderNav(); renderMain();
+  }catch(e){ $("msg").textContent="Mapping file not readable: "+(e.message||e); $("msg").className="msg bad"; }
+});
 $("refresh").addEventListener("click",fetchAll);
 $("csv").addEventListener("click",downloadCSV);
 $("auto").addEventListener("change",e=>{ if(e.target.checked){timer=setInterval(fetchAll,15000);} else {clearInterval(timer);} });
