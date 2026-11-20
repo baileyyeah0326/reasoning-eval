@@ -772,11 +772,11 @@ function renderNav(){
   let html = '<div class="nav-progress">'+done+' / '+cases.length+' completed</div><div class="chips">';
   for(let i=0;i<cases.length;i++){
     const full = fullyScored(evals[i]);
-    const part = !full && hasPrediction(i);
+    const part = !full && caseHasScores(i);   // a diagnosis carried over from the patient's other page does not count
     const cls = "chip"+(i===idx?" active":"")+(full?" done":(part?" partial":""));
     const inner = (full && i!==idx) ? CHECK : (i+1);
     const dot = isSubmitted(i) ? '<span class="chip-dot"></span>' : "";
-    const state = full ? "completed" : (part ? "predicted, not scored" : "not started");
+    const state = full ? "completed" : (part ? "partly scored" : "not started");
     html += '<button class="'+cls+'" data-i="'+i+'" title="Case '+(i+1)+' \u00b7 '+state+'">'+inner+dot+'</button>';
   }
   html += '</div>';
