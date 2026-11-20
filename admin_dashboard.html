@@ -121,7 +121,6 @@ tr:last-child td{border-bottom:none;}
       <select id="fEval"><option value="">All evaluators (overview)</option></select></div>
     <button class="btn primary" id="refresh">Refresh</button>
     <button class="btn" id="csv">Download CSV</button>
-    <label class="btn" title="Local file ~/DisCO/diag/physician_eval/single100_mapping.json; read in the browser only, never uploaded">Load model mapping<input type="file" id="mapfile" accept=".json" hidden></label>
     <label class="btn" style="cursor:default;">Auto-refresh<input type="checkbox" id="auto" style="margin-left:6px;" /></label>
     <span class="msg" id="msg"></span>
   </div>
@@ -181,11 +180,12 @@ const supa = (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY)
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
 let ROWS=[], CASES=[], collapsed={}, selCase=null, timer=null;
-// page -> {case, system}; loaded from a local file only (the site itself stays blinded)
-let MAPPING=null;
-function sysOfIdx(i){ const c=CASES[i]; return MAPPING && c && MAPPING[c.id] ? MAPPING[c.id].system : null; }
+// page id -> model that wrote the reasoning (from ~/DisCO/diag/physician_eval/single100_mapping.json)
+const PAGE_MODEL = {"P001":"GPT-5.5","P002":"ReSS","P003":"ReSS","P004":"GPT-5.5","P005":"GPT-5.5","P006":"GPT-5.5","P007":"ReSS","P008":"ReSS","P009":"GPT-5.5","P010":"ReSS","P011":"ReSS","P012":"ReSS","P013":"GPT-5.5","P014":"GPT-5.5","P015":"ReSS","P016":"ReSS","P017":"ReSS","P018":"GPT-5.5","P019":"GPT-5.5","P020":"GPT-5.5","P021":"ReSS","P022":"GPT-5.5","P023":"GPT-5.5","P024":"GPT-5.5","P025":"ReSS","P026":"ReSS","P027":"ReSS","P028":"GPT-5.5","P029":"GPT-5.5","P030":"ReSS","P031":"ReSS","P032":"ReSS","P033":"GPT-5.5","P034":"ReSS","P035":"GPT-5.5","P036":"GPT-5.5","P037":"ReSS","P038":"ReSS","P039":"ReSS","P040":"GPT-5.5","P041":"ReSS","P042":"GPT-5.5","P043":"GPT-5.5","P044":"GPT-5.5","P045":"GPT-5.5","P046":"GPT-5.5","P047":"GPT-5.5","P048":"ReSS","P049":"ReSS","P050":"ReSS","P051":"ReSS","P052":"ReSS","P053":"GPT-5.5","P054":"ReSS","P055":"GPT-5.5","P056":"GPT-5.5","P057":"ReSS","P058":"ReSS","P059":"GPT-5.5","P060":"ReSS","P061":"GPT-5.5","P062":"GPT-5.5","P063":"ReSS","P064":"GPT-5.5","P065":"GPT-5.5","P066":"GPT-5.5","P067":"GPT-5.5","P068":"ReSS","P069":"ReSS","P070":"GPT-5.5","P071":"ReSS","P072":"GPT-5.5","P073":"ReSS","P074":"GPT-5.5","P075":"GPT-5.5","P076":"ReSS","P077":"ReSS","P078":"ReSS","P079":"ReSS","P080":"ReSS","P081":"GPT-5.5","P082":"GPT-5.5","P083":"ReSS","P084":"GPT-5.5","P085":"GPT-5.5","P086":"GPT-5.5","P087":"GPT-5.5","P088":"GPT-5.5","P089":"GPT-5.5","P090":"ReSS","P091":"GPT-5.5","P092":"ReSS","P093":"ReSS","P094":"ReSS","P095":"GPT-5.5","P096":"ReSS","P097":"ReSS","P098":"GPT-5.5","P099":"ReSS","P100":"ReSS"};
+const MAPPING = Object.fromEntries(Object.entries(PAGE_MODEL).map(([k,v])=>[k,{system:v}]));
+function sysOfIdx(i){ const c=CASES[i]; return c && MAPPING[c.id] ? MAPPING[c.id].system : null; }
 function patientOf(i){ const c=CASES[i]; return (c && c._case) || ""; }
-function systems(){ return MAPPING ? [...new Set(Object.values(MAPPING).map(m=>m.system))].sort() : []; }
+function systems(){ return ["ReSS","GPT-5.5"]; }
 
 function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 function avg(a){ const v=a.filter(x=>x!=null); return v.length? v.reduce((x,y)=>x+y,0)/v.length : null; }
@@ -376,6 +376,8 @@ function renderMain(){
     card("Doctor accuracy",pct(accOf(all)))+card("Hallucination rate",pct(hallAvg))+
     SCALE_DIMS.map(d=>card("Avg "+d.label+" (1-3)",f2(avg(rows.map(r=>r[d.k]))))).join("")+
     card("Avg all scales (1-3)",f2(scaleAvg))+'</div>';
+  html+=breakdown("ReSS vs GPT-5.5", r=>r.system, systems(), k=>k);
+  html+=pairedHtml();
   if(curEval()){
     const list=all.slice().sort((a,b)=>caseIdOf(a.case_index).localeCompare(caseIdOf(b.case_index)));
     html+='<h2>'+esc(curEval())+' — by case</h2><div class="wrap"><table><thead><tr><th>Case</th><th>Patient</th>'+(MAPPING?'<th>Model</th>':'')+'<th>Test set</th><th>True label</th><th>Predicted</th>'+
@@ -397,7 +399,6 @@ function renderMain(){
           "<td class='num'>"+pct(accOf(mine))+"</td>"+dimCells(rs)+"<td class='mono' style='white-space:nowrap;'>"+esc(fmtTime(last))+"</td></tr>";
       }).join("")+'</tbody></table></div>';
   }
-  if(MAPPING){ html+=breakdown("By model", r=>r.system, systems(), k=>k); html+=pairedHtml(); }
   const tsKeys=TEST_SETS.map(t=>t.key).filter(k=>CASES.some(c=>testSetOf(c)===k));
   html+=breakdown("By test set", r=>r.test_set, tsKeys, tsName);
   html+=breakdown("By true label", r=>r.label, LABEL_ORDER, k=>k);
@@ -458,14 +459,6 @@ function downloadCSV(){
 }
 
 $("fEval").addEventListener("change",()=>{ renderNav(); renderMain(); });
-$("mapfile").addEventListener("change",async ev=>{
-  try{
-    const j=JSON.parse(await ev.target.files[0].text()); MAPPING=j.mapping||j;
-    ROWS.forEach(r=>{ r.system=sysOfIdx(r.case_index); });
-    $("msg").textContent="Model mapping loaded: "+systems().join(" vs "); $("msg").className="msg";
-    renderNav(); renderMain();
-  }catch(e){ $("msg").textContent="Mapping file not readable: "+(e.message||e); $("msg").className="msg bad"; }
-});
 $("refresh").addEventListener("click",fetchAll);
 $("csv").addEventListener("click",downloadCSV);
 $("auto").addEventListener("change",e=>{ if(e.target.checked){timer=setInterval(fetchAll,15000);} else {clearInterval(timer);} });
