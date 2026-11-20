@@ -190,6 +190,7 @@ const MAPPING = Object.fromEntries(Object.entries(PAGE_MODEL).map(([k,v])=>[k,{s
 function sysOfIdx(i){ const c=CASES[i]; return c && MAPPING[c.id] ? MAPPING[c.id].system : null; }
 function patientOf(i){ const c=CASES[i]; return (c && c._case) || ""; }
 function systems(){ return ["ReSS","GPT-5.5"]; }
+function modelRank(i){ return sysOfIdx(i)==="GPT-5.5" ? 0 : 1; }
 function modelTag(m){ return m ? '<span class="mtag '+(m==="ReSS"?"ress":"gpt")+'">'+esc(m)+'</span>' : ""; }
 
 function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
@@ -261,7 +262,7 @@ function computeGroups(){
     const present=Object.keys(tmp[g.key]);
     const ordered=LABEL_ORDER.filter(l=>present.includes(l)).concat(present.filter(l=>!LABEL_ORDER.includes(l)).sort());
     ordered.forEach(lab=>{
-      const idxs=tmp[g.key][lab].slice().sort((a,b)=>patientOf(a).localeCompare(patientOf(b))||caseIdOf(a).localeCompare(caseIdOf(b)));
+      const idxs=tmp[g.key][lab].slice().sort((a,b)=>patientOf(a).localeCompare(patientOf(b))||modelRank(a)-modelRank(b));   // per patient: GPT-5.5 left, ReSS right
       g.subs.push({label:lab,idxs});
       g.total+=idxs.length; g.scored+=idxs.filter(caseHasScore).length;
     });
@@ -272,7 +273,7 @@ function computeGroups(){
 function renderNav(){
   const groups=computeGroups();
   const nEv=curEval()?1:new Set(ROWS.map(r=>r.evaluator)).size;
-  let html='<div class="nav-legend">'+modelTag("ReSS")+modelTag("GPT-5.5")+'</div><div class="nav-legend">'+(curEval()?'Filled = scored by '+esc(curEval()):'Number in corner = evaluators who scored it')+'</div>';
+  let html='<div class="nav-legend">'+modelTag("GPT-5.5")+modelTag("ReSS")+'</div><div class="nav-legend">'+(curEval()?'Filled = scored by '+esc(curEval()):'Number in corner = evaluators who scored it')+'</div>';
   groups.forEach(g=>{
     if(!g.total) return;
     const col=!!collapsed[g.key];
