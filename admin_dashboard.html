@@ -256,7 +256,7 @@ function computeGroups(){
     const present=Object.keys(tmp[g.key]);
     const ordered=LABEL_ORDER.filter(l=>present.includes(l)).concat(present.filter(l=>!LABEL_ORDER.includes(l)).sort());
     ordered.forEach(lab=>{
-      const idxs=tmp[g.key][lab].slice().sort((a,b)=>caseIdOf(a).localeCompare(caseIdOf(b)));
+      const idxs=tmp[g.key][lab].slice().sort((a,b)=>patientOf(a).localeCompare(patientOf(b))||caseIdOf(a).localeCompare(caseIdOf(b)));
       g.subs.push({label:lab,idxs});
       g.total+=idxs.length; g.scored+=idxs.filter(caseHasScore).length;
     });
@@ -277,12 +277,12 @@ function renderNav(){
     if(!col){
       g.subs.forEach(sub=>{
         if(!sub.idxs.length) return;
-        html+='<div class="navsub"><div class="navsub-name">'+esc(sub.label)+'<span class="navsub-count">'+sub.idxs.length+'</span></div><div class="chips">'+
+        html+='<div class="navsub"><div class="navsub-name">'+esc(sub.label)+'<span class="navsub-count">'+new Set(sub.idxs.map(patientOf)).size+' patients · '+sub.idxs.length+' pages</span></div><div class="chips">'+
           sub.idxs.map(i=>{
             const n=scoreCount(i);
             const cls="chip"+(i===selCase?" active":"")+(n?" has":"");
             const badge=(!curEval() && nEv>0)?'<span class="chip-n">'+n+'</span>':'';
-            return '<button class="'+cls+'" data-i="'+i+'" title="'+esc(caseIdOf(i))+' · '+n+' scored">'+esc(caseIdOf(i))+badge+'</button>';
+            return '<button class="'+cls+'" data-i="'+i+'" title="'+esc(caseIdOf(i))+' · patient '+esc(patientOf(i))+' · '+esc(sysOfIdx(i)||"")+' · '+n+' scored">'+esc(caseIdOf(i))+badge+'</button>';
           }).join("")+'</div></div>';
       });
     }
