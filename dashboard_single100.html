@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Blind Eval Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--paper:#f3efe6;--card:#fbf9f4;--ink:#22262f;--ink2:#5a606e;--ink3:#8b8f9a;--line:#ddd6c6;--teal:#0f6e60;--amber:#b06a16;--rose:#9d3a3a;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'IBM Plex Sans',system-ui,sans-serif;color:var(--ink);background:var(--paper);padding:20px 16px 40px;}
+.wrap{max-width:1100px;margin:0 auto;}
+h1{font-family:'Fraunces',serif;font-size:22px;margin-bottom:4px;}
+h2{font-family:'Fraunces',serif;font-size:16px;margin:22px 0 10px;}
+.muted{color:var(--ink3);font-size:13px;}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:14px 0;}
+button,label.btn{font:inherit;font-size:13px;padding:7px 14px;border-radius:8px;border:1px solid var(--line);background:var(--card);cursor:pointer;}
+.pill{font-size:12px;padding:3px 10px;border-radius:99px;background:#e3efe9;color:var(--teal);}
+.pill.warn{background:#f6ead6;color:var(--amber);}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;overflow-x:auto;}
+table{border-collapse:collapse;width:100%;font-size:13px;}
+th,td{padding:6px 9px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap;}
+th:first-child,td:first-child{text-align:left;}
+th{color:var(--ink2);font-weight:600;}
+.mono{font-family:'IBM Plex Mono',monospace;}
+.err{color:var(--rose);margin:8px 0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Blind evaluation (100 pages) — dashboard</h1>
+  <div class="muted">50 patients × 2 reasonings, one per page. Load the local mapping file to see which model wrote each page; it is read in the browser only and never uploaded.</div>
+  <div class="bar">
+    <button id="reload">Reload</button>
+    <label class="btn">Load mapping (single100_mapping.json)<input id="mapfile" type="file" accept=".json" hidden></label>
+    <span id="mapState" class="pill warn">blinded</span>
+    <span id="stamp" class="muted"></span>
+  </div>
+  <div id="err" class="err"></div>
+  <h2>Progress per evaluator</h2><div class="card" id="progress"></div>
+  <h2>Scores (mean ± sd over rated cases)</h2><div class="card" id="scores"></div>
+    <h2>Paired by patient (same evaluator, both pages scored)</h2><div class="card" id="wins"></div>
+  <h2>Per page</h2><div class="card" id="cases"></div>
+</div>
+<script>
+const SUPABASE_URL      = "https://nndkbviqczxqxqgncggd.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_cm4fMIaM-TfjTclOJIbMGw_SPzSKVeZ";
+const SUPABASE_TABLE = "evaluations";
+const DATA_URL = "./data_single100.json";
+const CASE_INDEX_OFFSET = 4000;   // same as index.html
+const DIMS = [["hallucination","Hallucination rate (lower better)"],["logic","Logic"],["consistency","Consistency"],["explanation_sufficiency","Explanation sufficiency"]];
+const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let pages = [], rows = [], mapping = null;
+
+const $ = id=>document.getElementById(id);
+const esc = s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const mean = a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:NaN;
+const sd = a=>{ if(a.length<2) return NaN; const m=mean(a); return Math.sqrt(a.reduce((s,x)=>s+(x-m)**2,0)/(a.length-1)); };
+const f2 = x=>isNaN(x)?"–":x.toFixed(2);
+const sysOf = i=> mapping ? mapping[pages[i].id].system : "all pages";
+const systems = ()=> mapping ? [...new Set(Object.values(mapping).map(m=>m.system))].sort() : ["all pages"];
+const scoreOf = (r,k)=> k==="hallucination" ? (r[k]?1:0) : r[k];
+const complete = r=> r && !r.cleared && r.doctor_prediction && DIMS.every(([k])=>r[k]!=null);
+
+async function load(){
+  $("err").textContent = "";
+  try{
+    pages = await (await fetch(DATA_URL,{cache:"no-store"})).json();
+    rows = [];
+    for(let from=0;;from+=1000){
+      const { data, error } = await supa.from(SUPABASE_TABLE).select("*")
+        .gte("case_index", CASE_INDEX_OFFSET).lt("case_index", CASE_INDEX_OFFSET + pages.length).range(from, from+999);
+      if(error) throw error;
+      rows = rows.concat(data); if(data.length<1000) break;
+    }
+    $("stamp").textContent = "loaded " + new Date().toLocaleTimeString() + " · " + rows.length + " rows";
+    render();
+  }catch(e){ $("err").textContent = "Load failed: " + (e.message||e); }
+}
+
+function render(){
+  const ev = {};   // evaluator -> page index -> row
+  rows.forEach(r=>{ const i=r.case_index-CASE_INDEX_OFFSET; if(i>=0 && i<pages.length) (ev[r.evaluator]=ev[r.evaluator]||{})[i]=r; });
+  const names = Object.keys(ev).sort(), sys = systems(), groups = [...names.map(n=>[n,[n]]), ["All evaluators", names]];
+  // progress + the evaluator's own diagnosis accuracy (one per patient)
+  $("progress").innerHTML = '<table><tr><th>Evaluator</th><th>Pages scored</th><th>Patients diagnosed</th><th>Own diagnosis = label</th><th>Last update</th></tr>' +
+    names.map(n=>{
+      const rs = Object.entries(ev[n]).filter(([,r])=>!r.cleared);
+      const pat = {}; rs.forEach(([i,r])=>{ if(r.doctor_prediction) pat[pages[i]._case] = String(r.doctor_prediction).toLowerCase()===String(pages[i].label).toLowerCase(); });
+      const np = Object.keys(pat).length, nc = Object.values(pat).filter(Boolean).length;
+      const last = rows.filter(r=>r.evaluator===n).map(r=>r.updated_at).sort().pop();
+      return '<tr><td>'+esc(n)+'</td><td>'+rs.filter(([,r])=>complete(r)).length+' / '+pages.length+'</td><td>'+np+' / 50</td><td>'+
+        (np?nc+' ('+(100*nc/np).toFixed(0)+'%)':'–')+'</td><td class="mono">'+esc((last||"").slice(0,16).replace("T"," "))+'</td></tr>';
+    }).join("") + '</table>';
+  // scores per system
+  const vals = (ns,s,k)=> ns.flatMap(n=>Object.entries(ev[n]).filter(([i,r])=>complete(r) && sysOf(i)===s).map(([,r])=>scoreOf(r,k)));
+  $("scores").innerHTML = '<table><tr><th>Evaluator</th><th>System</th><th>n</th>'+DIMS.map(([,l])=>'<th>'+l+'</th>').join("")+'</tr>' +
+    groups.flatMap(([g,ns])=>sys.map(s=>'<tr><td>'+esc(g)+'</td><td>'+esc(s)+'</td><td>'+vals(ns,s,"logic").length+'</td>'+
+      DIMS.map(([k])=>{ const v=vals(ns,s,k); return '<td>'+(k==="hallucination"?f2(mean(v)):f2(mean(v))+' ± '+f2(sd(v)))+'</td>'; }).join("")+'</tr>')).join("") + '</table>';
+  // paired: same evaluator, same patient, both pages complete
+  if(!mapping){ $("wins").innerHTML = '<span class="muted">Load the mapping file to compare the two systems.</span>'; }
+  else {
+    const pairs = [];   // [rowOfSys0, rowOfSys1]
+    names.forEach(n=>{ const byCase={};
+      Object.entries(ev[n]).forEach(([i,r])=>{ if(complete(r)) (byCase[pages[i]._case]=byCase[pages[i]._case]||{})[sysOf(i)]=r; });
+      Object.values(byCase).forEach(o=>{ if(o[sys[0]] && o[sys[1]]) pairs.push([o[sys[0]],o[sys[1]]]); }); });
+    $("wins").innerHTML = '<div class="muted" style="margin-bottom:8px">'+pairs.length+' evaluator × patient pairs</div><table><tr><th>Dimension</th><th>'+esc(sys[0])+' better</th><th>equal</th><th>'+esc(sys[1])+' better</th><th>mean diff ('+esc(sys[0])+' − '+esc(sys[1])+')</th></tr>' +
+      DIMS.map(([k,l])=>{ let w0=0,eq=0,w1=0; const df=[];
+        pairs.forEach(([a,b])=>{ let x=scoreOf(a,k), y=scoreOf(b,k); df.push(x-y); if(k==="hallucination"){ x=-x; y=-y; } if(x>y) w0++; else if(y>x) w1++; else eq++; });
+        return '<tr><td>'+l.replace(/ \(.*/,"")+'</td><td>'+w0+'</td><td>'+eq+'</td><td>'+w1+'</td><td>'+f2(mean(df))+'</td></tr>'; }).join("") + '</table>';
+  }
+  // per page
+  $("cases").innerHTML = '<table><tr><th>Page</th><th>Patient</th>'+(mapping?'<th>System</th>':'')+'<th>Label</th><th>Test set</th><th>n</th><th>Halluc.</th><th>Logic</th><th>Consist.</th><th>Suffic.</th><th>Comments</th></tr>' +
+    pages.map((p,i)=>{
+      const rs = names.map(n=>ev[n][i]).filter(complete);
+      const cm = names.filter(n=>ev[n][i] && ev[n][i].comment && !ev[n][i].cleared).map(n=>esc(n)+': '+esc(ev[n][i].comment)).join("<br>");
+      return '<tr><td>'+esc(p.id)+'</td><td>'+esc(p._case)+'</td>'+(mapping?'<td>'+esc(sysOf(i))+'</td>':'')+'<td>'+esc(p.label)+'</td><td>'+esc(p._test_set||"")+'</td><td>'+rs.length+'</td>'+
+        DIMS.map(([k])=>'<td>'+f2(mean(rs.map(r=>scoreOf(r,k))))+'</td>').join("")+'<td style="text-align:left;white-space:normal">'+cm+'</td></tr>';
+    }).join("") + '</table>';
+}
+
+$("reload").onclick = load;
+$("mapfile").onchange = async ev=>{
+  try{
+    const j = JSON.parse(await ev.target.files[0].text());
+    mapping = j.mapping || j;
+    $("mapState").textContent = "unblinded: " + systems().join(" vs "); $("mapState").className = "pill";
+    render();
+  }catch(e){ $("err").textContent = "Mapping file not readable: " + (e.message||e); }
+};
+load();
+</script>
+</body>
+</html>
