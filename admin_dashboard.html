@@ -103,6 +103,10 @@ tr:last-child td{border-bottom:none;}
 .back-btn svg{width:15px;height:15px;}
 .cmtbox{margin-top:14px;font-size:13.5px;line-height:1.6;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:12px 14px;white-space:pre-wrap;}
 .cmtbox .rtitle{margin-bottom:5px;}
+.mtag{display:inline-block;margin-left:5px;padding:0 5px;border-radius:5px;font-size:10px;line-height:16px;font-family:'IBM Plex Sans',sans-serif;font-weight:600;}
+.mtag.ress{background:#dde8f7;color:#1f4f8f;border:1px solid #9fbce3;}
+.mtag.gpt{background:#f6e6cf;color:#8a520f;border:1px solid #e2c393;}
+.chip.active .mtag{border-color:transparent;}
 .chip-n{position:absolute;top:-6px;right:-6px;min-width:15px;height:15px;padding:0 3px;border-radius:99px;background:var(--paper2);border:1px solid var(--line2);font-size:9.5px;line-height:13px;color:var(--ink2);text-align:center;}
 .chip.has .chip-n{background:var(--teal);border-color:var(--teal);color:#fff;}
 .rowlink{cursor:pointer;}
@@ -186,6 +190,7 @@ const MAPPING = Object.fromEntries(Object.entries(PAGE_MODEL).map(([k,v])=>[k,{s
 function sysOfIdx(i){ const c=CASES[i]; return c && MAPPING[c.id] ? MAPPING[c.id].system : null; }
 function patientOf(i){ const c=CASES[i]; return (c && c._case) || ""; }
 function systems(){ return ["ReSS","GPT-5.5"]; }
+function modelTag(m){ return m ? '<span class="mtag '+(m==="ReSS"?"ress":"gpt")+'">'+esc(m)+'</span>' : ""; }
 
 function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 function avg(a){ const v=a.filter(x=>x!=null); return v.length? v.reduce((x,y)=>x+y,0)/v.length : null; }
@@ -267,7 +272,7 @@ function computeGroups(){
 function renderNav(){
   const groups=computeGroups();
   const nEv=curEval()?1:new Set(ROWS.map(r=>r.evaluator)).size;
-  let html='<div class="nav-legend">'+(curEval()?'Filled = scored by '+esc(curEval()):'Number in corner = evaluators who scored it')+'</div>';
+  let html='<div class="nav-legend">'+modelTag("ReSS")+modelTag("GPT-5.5")+'</div><div class="nav-legend">'+(curEval()?'Filled = scored by '+esc(curEval()):'Number in corner = evaluators who scored it')+'</div>';
   groups.forEach(g=>{
     if(!g.total) return;
     const col=!!collapsed[g.key];
@@ -282,7 +287,7 @@ function renderNav(){
             const n=scoreCount(i);
             const cls="chip"+(i===selCase?" active":"")+(n?" has":"");
             const badge=(!curEval() && nEv>0)?'<span class="chip-n">'+n+'</span>':'';
-            return '<button class="'+cls+'" data-i="'+i+'" title="'+esc(caseIdOf(i))+' · patient '+esc(patientOf(i))+' · '+esc(sysOfIdx(i)||"")+' · '+n+' scored">'+esc(caseIdOf(i))+badge+'</button>';
+            return '<button class="'+cls+'" data-i="'+i+'" title="'+esc(caseIdOf(i))+' · patient '+esc(patientOf(i))+' · '+esc(sysOfIdx(i)||"")+' · '+n+' scored">'+esc(caseIdOf(i))+modelTag(sysOfIdx(i))+badge+'</button>';
           }).join("")+'</div></div>';
       });
     }
@@ -385,7 +390,7 @@ function renderMain(){
       list.map(r=>{
         const predMatch=r.doctor_prediction!=null ? (r.doctor_prediction===r.label?"tag ok":"tag wrong") : "";
         const pred=r.doctor_prediction!=null?"<span class='"+predMatch+"'>"+esc(r.doctor_prediction)+"</span>":"—";
-        return "<tr class='rowlink' data-i='"+r.case_index+"'><td class='mono'>"+esc(r.case_id)+"</td><td class='mono'>"+esc(r.patient)+"</td>"+(MAPPING?"<td>"+esc(r.system)+"</td>":"")+"<td>"+esc(tsName(r.test_set))+"</td><td>"+esc(r.label)+"</td><td>"+pred+"</td>"+
+        return "<tr class='rowlink' data-i='"+r.case_index+"'><td class='mono'>"+esc(r.case_id)+"</td><td class='mono'>"+esc(r.patient)+"</td>"+(MAPPING?"<td>"+modelTag(r.system)+"</td>":"")+"<td>"+esc(tsName(r.test_set))+"</td><td>"+esc(r.label)+"</td><td>"+pred+"</td>"+
           DIMS.map(d=>"<td class='num'>"+(r.logic==null?"—":(d.type==="binary"?binLabel(r[d.k]):esc(r[d.k])))+"</td>").join("")+
           "<td>"+esc(r.comment||"")+"</td><td class='mono' style='white-space:nowrap;'>"+esc(fmtTime(r.updated_at))+"</td></tr>";
       }).join("")+'</tbody></table></div>';
@@ -441,7 +446,7 @@ function renderCase(i){
   $("main").innerHTML=
     '<button class="btn back-btn" id="backBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>Back to overview</button>'+
     '<div class="casebox"><div class="case-head"><span class="case-id">'+esc(caseIdOf(i))+'</span>'+
-      '<span class="case-label">'+esc(lab)+'</span><span class="tag">'+esc(grp)+'</span><span class="tag">patient '+esc(patientOf(i))+'</span>'+(sysOfIdx(i)?'<span class="tag">'+esc(sysOfIdx(i))+'</span>':'')+'<span class="muted" style="font-size:12px;">missing: '+esc(miss)+'</span></div>'+
+      '<span class="case-label">'+esc(lab)+'</span><span class="tag">'+esc(grp)+'</span><span class="tag">patient '+esc(patientOf(i))+'</span>'+modelTag(sysOfIdx(i))+'<span class="muted" style="font-size:12px;">missing: '+esc(miss)+'</span></div>'+
       '<div class="case-cols"><div>'+fgrid+'</div><div><div class="rtitle">Reasoning</div><div class="reasoning">'+esc(reasoning)+'</div></div></div>'+
     '</div>'+
     '<h2>'+(e?esc(e)+"'s scoring":"All evaluators' scoring ("+myRows.length+")")+'</h2>'+scoreHtml;
