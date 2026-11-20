@@ -81,7 +81,8 @@ async function load(){
 
 function render(){
   const ev = {};   // evaluator -> page index -> row
-  rows.forEach(r=>{ const i=r.case_index-CASE_INDEX_OFFSET; if(i>=0 && i<pages.length) (ev[r.evaluator]=ev[r.evaluator]||{})[i]=r; });
+  // cleared rows are withdrawn: ignore them (an evaluator with only cleared rows is not listed)
+  rows.forEach(r=>{ const i=r.case_index-CASE_INDEX_OFFSET; if(!r.cleared && i>=0 && i<pages.length) (ev[r.evaluator]=ev[r.evaluator]||{})[i]=r; });
   const names = Object.keys(ev).sort(), sys = systems(), groups = [...names.map(n=>[n,[n]]), ["All evaluators", names]];
   // progress + the evaluator's own diagnosis accuracy (one per patient)
   $("progress").innerHTML = '<table><tr><th>Evaluator</th><th>Pages scored</th><th>Patients diagnosed</th><th>Own diagnosis = label</th><th>Last update</th></tr>' +

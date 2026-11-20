@@ -867,9 +867,12 @@ els.sideCollapse.addEventListener("click",toggleSidebar);
 els.btnClearOne.addEventListener("click",()=>{
   const had = caseHasData(idx), wasSubmitted = isSubmitted(idx);
   if(!had && !wasSubmitted) return;
-  if(!window.confirm("Clear EVERYTHING for this case — prediction, scores, and comment?\n\nThe case returns to the prediction step. If it was already submitted, it is withdrawn in the database (kept for audit).")) return;
+  if(!window.confirm("Clear the scores and comment for this case?\n\nYour diagnosis stays locked. If the case was already submitted, the scores are withdrawn in the database (kept for audit).")) return;
   const i=idx;
-  delete evals[i]; predPick=null;
+  // the diagnosis is locked and shared with the patient's other page: keep it, clear only this page's scores
+  const pred = evals[i] && evals[i].doctor_prediction;
+  if(pred) evals[i] = {doctor_prediction: pred}; else delete evals[i];
+  predPick=null;
   if(wasSubmitted){ delete savedSnapshot[i]; }
   if(hadDbRow(i)) clearInDb([i]);
   renderContent(); renderPanel(); renderNav(); updateProgress(); saveState();
