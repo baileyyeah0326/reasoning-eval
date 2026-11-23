@@ -134,6 +134,27 @@ header{
 .content.split > .field{flex:0 0 auto;margin-bottom:16px;}
 .content.split > .field.reason{flex:1 1 auto;min-height:220px;display:flex;flex-direction:column;margin-bottom:0;}
 .content.split > .field.reason .prose{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;}
+/* Step 2 compaction: 3-column feature grid, tighter cells, label inline with its key */
+.content.split{padding-top:16px;}
+.content.split > .field{margin-bottom:10px;}
+.content.split .fkey{margin-bottom:4px;}
+.content.split .grid{grid-template-columns:repeat(3,1fr);border-radius:10px;}
+/* last cell fills its row, so no grey gap is left (feature count varies with missing variables) */
+@media (min-width:1301px){
+  .content.split .grid .cell:last-child:nth-child(3n+2){grid-column:span 2;}
+  .content.split .grid .cell:last-child:nth-child(3n+1){grid-column:span 3;}
+}
+@media (max-width:1300px){
+  .content.split .grid{grid-template-columns:1fr 1fr;}
+  .content.split .grid .cell:last-child:nth-child(odd){grid-column:span 2;}
+}
+.content.split .grid .cell{padding:5px 10px;gap:8px;}
+.content.split .grid .mk{font-size:12px;}
+.content.split .grid .mv{font-size:12.5px;}
+.content.split > .field.answer{display:flex;align-items:center;gap:10px;}
+.content.split > .field.answer .fkey{margin-bottom:0;}
+.content.split .label-chip{font-size:14px;padding:3px 11px;border-radius:8px;}
+.content.split > .field.reason .prose{font-size:14.5px;line-height:1.65;}
 .field{margin-bottom:22px;animation:up .4s ease both;}
 @keyframes up{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
 .fkey{display:inline-flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--ink3);margin-bottom:7px;}
