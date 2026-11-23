@@ -145,9 +145,9 @@ const SUPABASE_URL      = "https://nndkbviqczxqxqgncggd.supabase.co";   // e.g. 
 const SUPABASE_ANON_KEY = "sb_publishable_cm4fMIaM-TfjTclOJIbMGw_SPzSKVeZ";   // the long "anon public" key
 const SUPABASE_TABLE    = "evaluations";
 const DATA_SOURCES = [
-  { url: "./data_single100.json",  groupKey: "single100",  groupName: "Blind eval 100 (50 patients x 2 reasonings)" },
+  { url: "./data_single60.json",  groupKey: "single60",  groupName: "Blind eval 60 (30 patients x 2 reasonings)" },
 ];
-const CASE_INDEX_OFFSET = 4000;   // must match the evaluation page; rows of earlier case sets are ignored
+const CASE_INDEX_OFFSET = 5000;   // must match the evaluation page; rows of earlier case sets are ignored
 const FEATURE_LABELS = {
   PTGENDER:"Sex", PTEDUCAT:"Education (years)", APOE4:"APOE \u03b54 alleles", AGE:"Age (years)",
   CDRSB:"CDR-SB", ADAS11:"ADAS-Cog 11", ADAS13:"ADAS-Cog 13", MMSE:"MMSE",
@@ -184,8 +184,8 @@ const supa = (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY)
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
 let ROWS=[], CASES=[], collapsed={}, selCase=null, timer=null;
-// page id -> model that wrote the reasoning (from ~/DisCO/diag/physician_eval/single100_mapping.json)
-const PAGE_MODEL = {"P001":"GPT-5.5","P002":"ReSS","P003":"ReSS","P004":"GPT-5.5","P005":"GPT-5.5","P006":"GPT-5.5","P007":"ReSS","P008":"ReSS","P009":"GPT-5.5","P010":"ReSS","P011":"ReSS","P012":"ReSS","P013":"GPT-5.5","P014":"GPT-5.5","P015":"ReSS","P016":"ReSS","P017":"ReSS","P018":"GPT-5.5","P019":"GPT-5.5","P020":"GPT-5.5","P021":"ReSS","P022":"GPT-5.5","P023":"GPT-5.5","P024":"GPT-5.5","P025":"ReSS","P026":"ReSS","P027":"ReSS","P028":"GPT-5.5","P029":"GPT-5.5","P030":"ReSS","P031":"ReSS","P032":"ReSS","P033":"GPT-5.5","P034":"ReSS","P035":"GPT-5.5","P036":"GPT-5.5","P037":"ReSS","P038":"ReSS","P039":"ReSS","P040":"GPT-5.5","P041":"ReSS","P042":"GPT-5.5","P043":"GPT-5.5","P044":"GPT-5.5","P045":"GPT-5.5","P046":"GPT-5.5","P047":"GPT-5.5","P048":"ReSS","P049":"ReSS","P050":"ReSS","P051":"ReSS","P052":"ReSS","P053":"GPT-5.5","P054":"ReSS","P055":"GPT-5.5","P056":"GPT-5.5","P057":"ReSS","P058":"ReSS","P059":"GPT-5.5","P060":"ReSS","P061":"GPT-5.5","P062":"GPT-5.5","P063":"ReSS","P064":"GPT-5.5","P065":"GPT-5.5","P066":"GPT-5.5","P067":"GPT-5.5","P068":"ReSS","P069":"ReSS","P070":"GPT-5.5","P071":"ReSS","P072":"GPT-5.5","P073":"ReSS","P074":"GPT-5.5","P075":"GPT-5.5","P076":"ReSS","P077":"ReSS","P078":"ReSS","P079":"ReSS","P080":"ReSS","P081":"GPT-5.5","P082":"GPT-5.5","P083":"ReSS","P084":"GPT-5.5","P085":"GPT-5.5","P086":"GPT-5.5","P087":"GPT-5.5","P088":"GPT-5.5","P089":"GPT-5.5","P090":"ReSS","P091":"GPT-5.5","P092":"ReSS","P093":"ReSS","P094":"ReSS","P095":"GPT-5.5","P096":"ReSS","P097":"ReSS","P098":"GPT-5.5","P099":"ReSS","P100":"ReSS"};
+// page id -> model that wrote the reasoning (from ~/DisCO/diag/physician_eval/single60_mapping.json)
+const PAGE_MODEL = {"P01":"GPT-5.5","P02":"GPT-5.5","P03":"ReSS","P04":"ReSS","P05":"GPT-5.5","P06":"ReSS","P07":"GPT-5.5","P08":"GPT-5.5","P09":"ReSS","P10":"GPT-5.5","P11":"ReSS","P12":"ReSS","P13":"ReSS","P14":"GPT-5.5","P15":"ReSS","P16":"GPT-5.5","P17":"GPT-5.5","P18":"GPT-5.5","P19":"GPT-5.5","P20":"ReSS","P21":"ReSS","P22":"GPT-5.5","P23":"ReSS","P24":"ReSS","P25":"GPT-5.5","P26":"ReSS","P27":"GPT-5.5","P28":"ReSS","P29":"GPT-5.5","P30":"ReSS","P31":"ReSS","P32":"GPT-5.5","P33":"ReSS","P34":"ReSS","P35":"ReSS","P36":"ReSS","P37":"ReSS","P38":"ReSS","P39":"GPT-5.5","P40":"GPT-5.5","P41":"GPT-5.5","P42":"ReSS","P43":"GPT-5.5","P44":"GPT-5.5","P45":"GPT-5.5","P46":"GPT-5.5","P47":"ReSS","P48":"ReSS","P49":"GPT-5.5","P50":"ReSS","P51":"GPT-5.5","P52":"GPT-5.5","P53":"GPT-5.5","P54":"GPT-5.5","P55":"ReSS","P56":"GPT-5.5","P57":"ReSS","P58":"ReSS","P59":"ReSS","P60":"GPT-5.5"};
 const MAPPING = Object.fromEntries(Object.entries(PAGE_MODEL).map(([k,v])=>[k,{system:v}]));
 function sysOfIdx(i){ const c=CASES[i]; return c && MAPPING[c.id] ? MAPPING[c.id].system : null; }
 function patientOf(i){ const c=CASES[i]; return (c && c._case) || ""; }
