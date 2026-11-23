@@ -129,6 +129,11 @@ header{
   .sidebar{flex-basis:220px;width:220px;}
 }
 .content{flex:1 1 auto;min-width:0;padding:26px 28px 60px;overflow-y:auto;}
+/* Step 2: features + label stay in view, only the reasoning scrolls (falls back to whole-pane scroll on short screens) */
+.content.split{display:flex;flex-direction:column;padding-bottom:22px;}
+.content.split > .field{flex:0 0 auto;margin-bottom:16px;}
+.content.split > .field.reason{flex:1 1 auto;min-height:220px;display:flex;flex-direction:column;margin-bottom:0;}
+.content.split > .field.reason .prose{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;}
 .field{margin-bottom:22px;animation:up .4s ease both;}
 @keyframes up{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
 .fkey{display:inline-flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--ink3);margin-bottom:7px;}
@@ -515,11 +520,14 @@ function renderContent(){
     fields = null;
   }
   if(fields===null){
+    els.content.classList.remove("split");
     const d=document.createElement("div"); d.className="field";
     d.innerHTML='<div class="fkey">Content</div>'+renderValue(cur);
     els.content.appendChild(d); return;
   }
   const predicted = hasPrediction(idx);
+  els.content.classList.toggle("split", predicted && fields.some(k=>classifyKey(k)==="reason"));
+  els.content.scrollTop = 0;
   fields.forEach((k,n)=>{
     const cls = classifyKey(k); const v = cur[k];
     // Step 1 (no prediction yet): show only features — hide reasoning and the true label
