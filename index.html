@@ -175,6 +175,37 @@ header{
 .grid .mk{font-family:'IBM Plex Sans','Heiti SC','SimHei','Microsoft YaHei',sans-serif;font-size:13px;font-weight:600;color:var(--ink);}
 .grid .mv{font-family:'IBM Plex Sans','Heiti SC','SimHei','Microsoft YaHei',sans-serif;font-size:13.5px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--ink);}
 
+/* grouped patient features */
+.fgroups{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
+.fg{background:var(--card);border:1px solid var(--line);border-radius:11px;overflow:hidden;}
+.fg-h{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--ink2);background:var(--paper2);padding:6px 12px;border-bottom:1px solid var(--line);}
+.fg-row{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:7px 12px;}
+.fg-row + .fg-row{border-top:1px solid var(--line);}
+.fg-row .mk{font-size:13px;font-weight:600;color:var(--ink);}
+.fg-row .mv{font-size:13.5px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--ink);}
+.fg-row .mv.na{color:var(--ink3);font-weight:500;font-style:italic;}
+.fgroups-rest{margin-top:10px;background:var(--card);border:1px solid var(--line);border-radius:11px;}
+/* narrower screens: step 1 drops to two columns below 1300px; the compact step-2 view keeps three down to 1100px */
+@media (max-width:1300px){
+  .content:not(.split) .fgroups{grid-template-columns:1fr 1fr;}
+  .content:not(.split) .fg.img{grid-column:span 2;}
+  .content:not(.split) .fg.img .fg-rows{display:grid;grid-template-columns:1fr 1fr;}
+  .content:not(.split) .fg.img .fg-row + .fg-row{border-top:none;}
+  .content:not(.split) .fg.img .fg-row{border-bottom:1px solid var(--line);}
+}
+@media (max-width:1100px){
+  .content.split .fgroups{grid-template-columns:1fr 1fr;}
+  .content.split .fg.img{grid-column:span 2;}
+  .content.split .fg.img .fg-rows{display:grid;grid-template-columns:1fr 1fr;}
+  .content.split .fg.img .fg-row + .fg-row{border-top:none;}
+  .content.split .fg.img .fg-row{border-bottom:1px solid var(--line);}
+}
+@media (max-width:700px){ .fgroups{grid-template-columns:1fr;} .fg.img{grid-column:auto;} .fg.img .fg-rows{display:block;} }
+.content.split .fg-h{padding:4px 10px;}
+.content.split .fg-row{padding:4px 10px;}
+.content.split .fg-row .mk{font-size:12px;}
+.content.split .fg-row .mv{font-size:12.5px;}
+
 /* ── Scoring panel ── */
 .panel{flex:0 0 360px;background:var(--card);border-left:1px solid var(--line2);padding:22px 22px 40px;overflow-y:auto;}
 @media (max-width:900px){ .panel{flex-basis:320px;} }
@@ -505,6 +536,23 @@ function loadSavedMeta(){
 }
 
 // ── Field value rendering ──
+// Patient features are shown in three clinical groups
+const FEATURE_GROUPS = [
+  { cls:"demo", title:"Demographic & genetic", keys:[["AGE","Age (years)"],["PTGENDER","Sex"],["PTEDUCAT","Education (years)"],["APOE4","APOE \u03b54 alleles"]] },
+  { cls:"cog",  title:"Cognitive",             keys:[["CDRSB","CDR-SB"],["MMSE","MMSE"],["ADAS11","ADAS-Cog 11"],["ADAS13","ADAS-Cog 13"],["RAVLT_immediate","RAVLT immediate"]] },
+  { cls:"img",  title:"Imaging (\u00f7 ICV)", keys:[["Hippocampus","Hippocampus"],["Entorhinal","Entorhinal cortex"],["MidTemp","Middle temporal"],["WholeBrain","Whole brain"],["Ventricles","Ventricles"]] },
+];
+function renderFeatureGroups(obj){
+  const known = new Set(FEATURE_GROUPS.flatMap(g=>g.keys.map(k=>k[0])));
+  const rest = Object.keys(obj).filter(k=>!known.has(k));
+  const row = (k,lab)=>{ const v=obj[k]; const na = v===null||v===undefined||String(v).toLowerCase()==="not available";
+    return '<div class="fg-row"><span class="mk">'+esc(lab)+'</span><span class="mv'+(na?' na':'')+'">'+(na?'not available':esc(v))+'</span></div>'; };
+  let html = '<div class="fgroups">'+FEATURE_GROUPS.map(g=>
+    '<div class="fg '+g.cls+'"><div class="fg-h">'+g.title+'</div><div class="fg-rows">'+
+    g.keys.filter(([k])=>k in obj).map(([k,lab])=>row(k,lab)).join("")+'</div></div>').join("")+'</div>';
+  if(rest.length) html += '<div class="fgroups-rest">'+rest.map(k=>row(k,FEATURE_LABELS[k]||k)).join("")+'</div>';
+  return html;
+}
 function renderValue(value){
   if(value===null||value===undefined) return '<span class="muted">—</span>';
   if(typeof value==="string"){
@@ -518,6 +566,7 @@ function renderValue(value){
   if(value && typeof value==="object" && !Array.isArray(value)){
     const entries = Object.entries(value);
     if(entries.every(([,vv])=>vv===null||typeof vv!=="object")){
+      if(FEATURE_GROUPS.some(g=>g.keys.some(([k])=>k in value))) return renderFeatureGroups(value);
       return '<div class="grid">'+entries.map(([mk,mv])=>
         '<div class="cell"><span class="mk">'+esc(FEATURE_LABELS[mk]||mk)+'</span><span class="mv">'+(mv===null?"—":esc(mv))+'</span></div>'
       ).join("")+'</div>';
